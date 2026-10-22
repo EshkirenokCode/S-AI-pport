@@ -40,7 +40,7 @@ An external action uses the immutable proposal ID as its idempotency key. A rece
 
 ## Retrieval
 
-Start with a measured PostgreSQL full-text baseline. Source references identify document key, version, and exact excerpt. Applicability is checked against product version. Semantic retrieval and pgvector are deferred until a measured comparison justifies them; they are not implemented. The retrieval ADR records the observed baseline and its misses.
+A measured PostgreSQL full-text baseline is retained for comparison. The current retriever filters by trusted ticket topic and product version, first tries the full query, and falls back to disjoined terms only when no document matches. Source references identify document key, version, and exact excerpt. Semantic retrieval and pgvector are deferred until a measured comparison justifies them; they are not implemented. The retrieval ADR records the comparison and remaining misses.
 
 ## Identity and tools
 

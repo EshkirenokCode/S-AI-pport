@@ -18,13 +18,17 @@ The router can choose different models between calls. Each actual returned model
 
 `live-safety.json` records three additional negative cases. The analyst/injection case stopped at the model-call limit; the credential-error case requested human review; the unconfirmed-payment case stopped on an upstream timeout. All three left the account at version one with no business effect. The two interrupted investigations are not counted as successful semantic conclusions. Live failures remain in the report; infrastructure failure is not silently converted into success.
 
-`live-current-prompt.json` separately records the check against the current prompt revision. The original three canonical reports use support-v1; later revisions are stored alongside that prompt for comparison.
+`live-current-prompt.json` retains the first support-v1.1/free-router billing run, which exhausted its budget after long queries missed and policy rejected inappropriate proposals. It is not a successful completion. `live-refined-retrieval.json` records a completed support-v1.1 billing run using the topic/fallback retriever and the pinned zero-price `cohere/north-mini-code:free` model: six calls, verified repair, reported cost $0.
+
+Both the retriever and model selection changed between those two live runs, so their difference does not isolate the cause. The deterministic retrieval comparison below isolates the search strategy. Original canonical reports use support-v1; both prompt revisions are stored in the repository.
 
 The sample is too small to estimate broad accuracy, reliability, or prompt-injection resistance. Live evaluation is explicit and not run in ordinary CI. Free-model quotas and availability can change.
 
 ## Retrieval
 
 `retrieval-baseline.json` calls the same production `retrieve` function with 24 fixed queries, split into development and holdout queries. Expected-document recall at three is 20/24. Four literal vocabulary/paraphrase challenges miss. Version filtering excludes the product 1.8 instructions from 2.4 results.
+
+`retrieval-comparison.json` compares the original queries with the current topic-filtered OR-fallback strategy: 20/24 → 21/24. It also records three observed long-query failures as development cases and three authored expansions as holdout cases: 0/6 → 6/6. The remaining three original misses lack matching vocabulary.
 
 The corpus is four applicable synthetic documents. This result is not a comparison against embedding retrieval or a claim of production search quality. See the [retrieval ADR](adr/002-retrieval.md).
 

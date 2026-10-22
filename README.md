@@ -63,6 +63,7 @@ The local development database must be running for integration/browser tests. Te
 ```sh
 make eval                                      # deterministic workflow cases
 PYTHONPATH=backend .venv/bin/python scripts/evaluate_retrieval.py
+PYTHONPATH=backend .venv/bin/python scripts/compare_retrieval.py
 make live                                      # explicit live calls, subject to provider quotas
 ```
 
@@ -72,11 +73,11 @@ Observed development results, 23 October 2026:
 
 | Check | Result | Scope |
 | --- | --- | --- |
-| Backend | 33 passing tests | Real PostgreSQL, HTTP laboratory and stdio MCP |
+| Backend | 34 passing tests | Real PostgreSQL, HTTP laboratory and stdio MCP |
 | Browser | 6 passing tests | Three families, approval restriction, permanent error, mobile |
 | Workflow evaluation | 36/36 expected outcomes; zero duplicate effects | Deterministic driver; 24 development and 12 holdout cases |
-| Retrieval | 20/24 expected documents in top three | Four applicable synthetic documents; lexical baseline |
-| Live smoke | Billing, delivery and configuration completed | 15 real free-router calls; reported cost $0 |
+| Retrieval | 20/24 baseline → 21/24 with topic/fallback; 0/6 → 6/6 on long queries | Four applicable synthetic documents; lexical search |
+| Live smoke | Three canonical families completed; current billing rechecked | 15 canonical free-router calls + 6 current pinned-model calls; reported cost $0 |
 
 These are small synthetic checks, not general LLM accuracy or production-impact claims. See [evaluation methodology and raw reports](docs/evaluations.md).
 
