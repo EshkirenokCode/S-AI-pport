@@ -1,0 +1,50 @@
+name: checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  application:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: saipport
+        ports: ['5432:5432']
+        options: --health-cmd 'pg_isready -U postgres' --health-interval 3s --health-retries 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/saipport
+      SANDBOX_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/saipport_lab
+      APP_SECRET: ci-only-integration-secret-not-for-deployment
+      SANDBOX_TOKEN: ci-only-laboratory-secret-not-for-deployment
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - uses: actions/setup-node@v4
+        with: {node-version: '24', cache: npm, cache-dependency-path: frontend/package-lock.json}
+      - run: python -m venv .venv && .venv/bin/pip install -r backend/requirements.lock
+      - run: .venv/bin/ruff check backend scripts
+      - run: cd backend && ../.venv/bin/python -m pytest -q
+      - run: cd frontend && npm ci && npm run build && npx playwright install --with-deps chromium && npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: browser-results, path: 'frontend/test-results', retention-days: 7}
+  containers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python scripts/configure.py
+      - run: docker compose up --build --wait --wait-timeout 180
+      - run: curl --fail http://127.0.0.1:8000/ready
+      - name: Verify a real container workflow
+        run: |
+          python -m pip install httpx
+          python scripts/container_smoke.py
+      - if: failure()
+        run: docker compose logs --tail 60
+      - if: always()
+        run: docker compose down
