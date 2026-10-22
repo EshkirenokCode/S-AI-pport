@@ -1,13 +1,18 @@
 # Implementation progress
 
-## Foundation
+## Foundation and billing vertical
 
-- Inspected the empty repository and local environment.
-- Recorded product scope, architecture, data boundaries, API/tools, permissions, threats, testing, and ADRs.
-- Selected an isolated PostgreSQL cluster and Python 3.12 for local work; Docker Compose remains the portable deployment target.
+- Product, architecture, contracts, permissions, threats and testing are recorded.
+- Isolated product/sandbox PostgreSQL databases and checksum-verified migrations run locally.
+- The API, durable worker, seven scoped tools and real stdio MCP transport are implemented.
+- The billing vertical was exercised over real HTTP: evidence → proposal → approval → one operation → a fresh Pro-access verification.
+- The React workspace builds successfully and the billing investigation/approval path was exercised in the browser.
+- Offline runs are explicitly labelled. The OpenRouter adapter allows only zero-price models with no paid fallback.
+
+## Live checkpoint
+
+The first OpenRouter free-router investigation invoked all six necessary tools and reached a grounded proposal awaiting approval. Six reported model calls cost $0. Full live completion and additional scenario validation are in progress.
 
 ## Next
 
-Build and verify the billing vertical, then add live model/MCP, remaining scenarios, reliability, browser tests, evaluations, and delivery materials.
-
-No runtime behavior is verified at this milestone.
+Finish integration/security/recovery tests, validate the remaining workflows, measure retrieval and evaluations, and package reproducible startup and delivery materials.

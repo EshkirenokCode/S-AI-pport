@@ -15,4 +15,7 @@ playwright-report/
 .DS_Store
 coverage.xml
 .coverage
+*.egg-info/
+*.tsbuildinfo
+backend/build/
 artifacts/private/
