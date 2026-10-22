@@ -1,0 +1,105 @@
+{
+  "kind": "live_smoke",
+  "date": "2026-10-22T19:25:27.939435+00:00",
+  "prompt_version": "support-v1",
+  "dataset": "three canonical synthetic cases; no accuracy claim",
+  "cases": [
+    {
+      "family": "integration",
+      "run_id": "3a46001c-edba-4c10-943f-21c10d0443af",
+      "proposal_status": "waiting_for_approval",
+      "status": "completed",
+      "verification": {
+        "plan": "Free",
+        "verified": true,
+        "operation_id": "c4b6ed01-4a6b-4239-8e2c-ab9e32c5a0cf",
+        "account_version": 2,
+        "cancel_requested": false
+      },
+      "source_count": 5,
+      "error": null,
+      "model_calls": [
+        {
+          "model": "dots-studio/dots-3-note-preview:free",
+          "input_tokens": 1103,
+          "output_tokens": 198,
+          "cost": 0,
+          "duration_ms": 3804
+        },
+        {
+          "model": "nvidia/nemotron-3.5-lightning:free",
+          "input_tokens": 1904,
+          "output_tokens": 194,
+          "cost": 0,
+          "duration_ms": 4860
+        },
+        {
+          "model": "nvidia/nemotron-3.5-lightning:free",
+          "input_tokens": 2366,
+          "output_tokens": 63,
+          "cost": 0,
+          "duration_ms": 3135
+        },
+        {
+          "model": "nvidia/nemotron-3.5-super-vl:free",
+          "input_tokens": 2703,
+          "output_tokens": 865,
+          "cost": 0,
+          "duration_ms": 80203
+        },
+        {
+          "model": "dots-studio/dots-3-note-preview:free",
+          "input_tokens": 2853,
+          "output_tokens": 1554,
+          "cost": 0,
+          "duration_ms": 15482
+        }
+      ],
+      "elapsed_seconds": 109.36,
+      "mcp_used": true,
+      "tool_errors": []
+    },
+    {
+      "family": "configuration",
+      "run_id": "3c961dfb-db11-4669-905e-c51fdcd71512",
+      "proposal_status": "completed",
+      "status": "completed",
+      "verification": null,
+      "source_count": 2,
+      "error": null,
+      "model_calls": [
+        {
+          "model": "cohere/north-mini-code:free",
+          "input_tokens": 736,
+          "output_tokens": 101,
+          "cost": 0,
+          "duration_ms": 2013
+        },
+        {
+          "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+          "input_tokens": 1513,
+          "output_tokens": 75,
+          "cost": 0,
+          "duration_ms": 6039
+        },
+        {
+          "model": "poolside/laguna-s-2.1:free",
+          "input_tokens": 1718,
+          "output_tokens": 53,
+          "cost": 0,
+          "duration_ms": 16219
+        },
+        {
+          "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+          "input_tokens": 2437,
+          "output_tokens": 619,
+          "cost": 0,
+          "duration_ms": 48770
+        }
+      ],
+      "elapsed_seconds": 73.93,
+      "mcp_used": true,
+      "tool_errors": []
+    }
+  ]
+}

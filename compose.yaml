@@ -1,0 +1,76 @@
+name: saipport
+x-product-env: &product-env
+  DATABASE_URL: postgresql://saipport_app:${APP_DB_PASSWORD:?Set APP_DB_PASSWORD}@postgres:5432/saipport
+  APP_SECRET: ${APP_SECRET:?Set APP_SECRET}
+  SANDBOX_TOKEN: ${SANDBOX_TOKEN:?Set SANDBOX_TOKEN}
+  APP_URL: http://api:8000
+  SANDBOX_URL: http://sandbox:8001
+  MODEL_PROVIDER: ${MODEL_PROVIDER:-deterministic}
+  OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+  OPENROUTER_MODEL: ${OPENROUTER_MODEL:-openrouter/free}
+  TOOL_TRANSPORT: mcp
+  SECURE_COOKIES: ${SECURE_COOKIES:-false}
+  ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8000,http://127.0.0.1:8000}
+  LIVE_CALLS_PER_DAY: ${LIVE_CALLS_PER_DAY:-40}
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Set APP_DB_PASSWORD}
+      LAB_DB_PASSWORD: ${LAB_DB_PASSWORD:?Set LAB_DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./scripts/init-databases.sh:/docker-entrypoint-initdb.d/01-databases.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U postgres']
+      interval: 3s
+      retries: 20
+    mem_limit: 512m
+    restart: unless-stopped
+  migrate:
+    build: .
+    environment:
+      <<: *product-env
+      SANDBOX_DATABASE_URL: postgresql://saipport_lab:${LAB_DB_PASSWORD}@postgres:5432/saipport_lab
+    command: [python, -m, app.migrate]
+    depends_on:
+      postgres: {condition: service_healthy}
+  sandbox:
+    build: .
+    environment:
+      SANDBOX_DATABASE_URL: postgresql://saipport_lab:${LAB_DB_PASSWORD}@postgres:5432/saipport_lab
+      SANDBOX_TOKEN: ${SANDBOX_TOKEN}
+      APP_SECRET: ${SANDBOX_TOKEN}
+    command: [uvicorn, 'app.sandbox:app', --host, '0.0.0.0', --port, '8001', --no-proxy-headers]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, python, -c, 'import os,urllib.request; urllib.request.urlopen(urllib.request.Request("http://localhost:8001/health",headers={"Authorization":"Bearer "+os.environ["SANDBOX_TOKEN"]}))']
+      interval: 5s
+      retries: 10
+    mem_limit: 256m
+    restart: unless-stopped
+  api:
+    build: .
+    environment: *product-env
+    ports: ['127.0.0.1:8000:8000']
+    depends_on:
+      sandbox: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, 'import urllib.request; urllib.request.urlopen("http://localhost:8000/ready")']
+      interval: 5s
+      retries: 10
+    mem_limit: 384m
+    restart: unless-stopped
+  worker:
+    build: .
+    environment: *product-env
+    command: [python, -m, app.worker]
+    depends_on:
+      api: {condition: service_healthy}
+    mem_limit: 384m
+    restart: unless-stopped
+volumes:
+  pgdata:

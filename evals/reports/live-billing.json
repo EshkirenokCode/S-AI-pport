@@ -1,0 +1,65 @@
+{
+  "kind": "live_smoke",
+  "date": "2026-10-23",
+  "prompt_version": "support-v1",
+  "dataset": "canonical billing case; exploratory free-router smoke, not a benchmark",
+  "cases": [
+    {
+      "family": "billing",
+      "run_id": "852af03e-8d69-42c9-b78f-2c6493308f0b",
+      "status": "completed",
+      "verification": {
+        "plan": "Pro",
+        "verified": true,
+        "operation_id": "e24ad073-6a3e-42a0-baba-0672673c57ca",
+        "account_version": 2,
+        "cancel_requested": false
+      },
+      "model_calls": [
+        {
+          "model": "cohere/north-mini-code:free",
+          "input_tokens": 737,
+          "output_tokens": 129,
+          "cost": 0,
+          "duration_ms": 25848
+        },
+        {
+          "model": "dots-studio/dots-3-note-preview:free",
+          "input_tokens": 1234,
+          "output_tokens": 114,
+          "cost": 0,
+          "duration_ms": 2929
+        },
+        {
+          "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+          "input_tokens": 1708,
+          "output_tokens": 153,
+          "cost": 0,
+          "duration_ms": 5071
+        },
+        {
+          "model": "cohere/north-mini-code:free",
+          "input_tokens": 1279,
+          "output_tokens": 35,
+          "cost": 0,
+          "duration_ms": 1541
+        },
+        {
+          "model": "poolside/laguna-xs-2.1:free",
+          "input_tokens": 2231,
+          "output_tokens": 286,
+          "cost": 0,
+          "duration_ms": 28841
+        },
+        {
+          "model": "nvidia/nemotron-3.5-lightning:free",
+          "input_tokens": 3075,
+          "output_tokens": 1206,
+          "cost": 0,
+          "duration_ms": 35513
+        }
+      ],
+      "mcp_used": true
+    }
+  ]
+}

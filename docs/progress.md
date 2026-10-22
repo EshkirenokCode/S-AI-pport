@@ -16,3 +16,11 @@ The first OpenRouter free-router investigation invoked all six necessary tools a
 ## Next
 
 Finish integration/security/recovery tests, validate the remaining workflows, measure retrieval and evaluations, and package reproducible startup and delivery materials.
+
+## Live model and reliability
+
+- Real OpenRouter free-router smoke runs completed billing (6 model calls), integration delivery (5), and configuration (4). All reported costs were zero. Both repairs were re-read and verified; stdio MCP was used in each investigation. Reports are under evals/reports.
+- 33 backend tests pass using real PostgreSQL, separate HTTP services, and MCP subprocesses, including ambiguous-operation receipt reconciliation, role revocation, stale state, and exhausted recovery/deadline budgets.
+- 36 deterministic workflow evaluation cases pass (24 development, 12 holdout); no duplicate effects. This is contract coverage, not measured LLM accuracy.
+- Six browser tests passed: billing, integration, configuration, analyst role, permanent error, and mobile. Screenshots were captured from the real product.
+- Docker Compose and CI are prepared; container CI verification is pending.
