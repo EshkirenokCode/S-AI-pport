@@ -1,0 +1,227 @@
+{
+  "kind": "retrieval_baseline",
+  "date": "2026-10-22T19:34:57.594042+00:00",
+  "retriever": "postgresql_fts_v1",
+  "corpus": "4 applicable synthetic documents; one legacy version excluded",
+  "limitations": "Small hand-written query set; final four queries are vocabulary/paraphrase challenges. No semantic retrieval claim.",
+  "queries": [
+    {
+      "query": "paid subscription",
+      "split": "development",
+      "expected": "billing-recovery",
+      "results": [
+        "billing-recovery"
+      ],
+      "hit_at_3": true
+    },
+    {
+      "query": "billing event failed",
+      "split": "development",
+      "expected": "billing-recovery",
+      "results": [
+        "billing-recovery"
+      ],
+      "hit_at_3": true
+    },
+    {
+      "query": "payment succeeded Free",
+      "split": "development",
+      "expected": "billing-recovery",
+      "results": [
+        "billing-recovery"
+      ],
+      "hit_at_3": true
+    },
+    {
+      "query": "reprocess billing event",
+      "split": "development",
+      "expected": "billing-recovery",
+      "results": [
+        "billing-recovery"
+      ],
+      "hit_at_3": true
+    },
+    {
+      "query": "missing invoice event",
+      "split": "development",
+      "expected": "billing-recovery",
+      "results": [
+        "billing-recovery"
+      ],
+      "hit_at_3": true
+    },
+    {
+      "query": "entitlements Pro",
+      "split": "development",
+      "expected": "billing-recovery",
+      "results": [
+        "billing-recovery"
+      ],
+      "hit_at_3": true
+    },
+    {
+      "query": "payment pending",
+      "split": "development",
+      "expected": "billing-recovery",
+      "results": [
+        "billing-recovery"
+      ],
+      "hit_at_3": true
+    },
+    {
+      "query": "verify entitlement",
+      "split": "development",
+      "expected": "billing-recovery",
+      "results": [
+        "billing-recovery"
+      ],
+      "hit_at_3": true
+    },
+    {
+      "query": "webhook deliveries",
+      "split": "development",
+      "expected": "delivery-recovery",
+      "results": [
+        "delivery-recovery",
+        "webhook-settings"
+      ],
+      "hit_at_3": true
+    },
+    {
+      "query": "integration unauthorized",
+      "split": "development",
+      "expected": "delivery-recovery",
+      "results": [
+        "delivery-recovery"
+      ],
+      "hit_at_3": true
+    },
+    {
+      "query": "destination acknowledgement",
+      "split": "development",
+      "expected": "delivery-recovery",
+      "results": [
+        "delivery-recovery"
+      ],
+      "hit_at_3": true
+    },
+    {
+      "query": "retry delivery cooldown",
+      "split": "development",
+      "expected": "delivery-recovery",
+      "results": [
+        "delivery-recovery"
+      ],
+      "hit_at_3": true
+    },
+    {
+      "query": "429 retry_after",
+      "split": "development",
+      "expected": "delivery-recovery",
+      "results": [
+        "webhook-settings",
+        "delivery-recovery"
+      ],
+      "hit_at_3": true
+    },
+    {
+      "query": "credentials configuration",
+      "split": "development",
+      "expected": "delivery-recovery",
+      "results": [
+        "delivery-recovery",
+        "webhook-settings"
+      ],
+      "hit_at_3": true
+    },
+    {
+      "query": "configure webhook retries",
+      "split": "development",
+      "expected": "webhook-settings",
+      "results": [
+        "webhook-settings",
+        "delivery-recovery"
+      ],
+      "hit_at_3": true
+    },
+    {
+      "query": "Retry attempts",
+      "split": "development",
+      "expected": "webhook-settings",
+      "results": [
+        "webhook-settings",
+        "delivery-recovery"
+      ],
+      "hit_at_3": true
+    },
+    {
+      "query": "Delivery policy",
+      "split": "holdout",
+      "expected": "webhook-settings",
+      "results": [
+        "webhook-settings"
+      ],
+      "hit_at_3": true
+    },
+    {
+      "query": "exponential backoff",
+      "split": "holdout",
+      "expected": "webhook-settings",
+      "results": [
+        "webhook-settings"
+      ],
+      "hit_at_3": true
+    },
+    {
+      "query": "support roles approvals",
+      "split": "holdout",
+      "expected": "permissions",
+      "results": [
+        "permissions"
+      ],
+      "hit_at_3": true
+    },
+    {
+      "query": "immutable repair proposal",
+      "split": "holdout",
+      "expected": "permissions",
+      "results": [
+        "permissions"
+      ],
+      "hit_at_3": true
+    },
+    {
+      "query": "my upgrade vanished",
+      "split": "holdout",
+      "expected": "billing-recovery",
+      "results": [],
+      "hit_at_3": false
+    },
+    {
+      "query": "events are stuck in transit",
+      "split": "holdout",
+      "expected": "delivery-recovery",
+      "results": [],
+      "hit_at_3": false
+    },
+    {
+      "query": "where are the resend options",
+      "split": "holdout",
+      "expected": "webhook-settings",
+      "results": [],
+      "hit_at_3": false
+    },
+    {
+      "query": "who can authorize remediation",
+      "split": "holdout",
+      "expected": "permissions",
+      "results": [],
+      "hit_at_3": false
+    }
+  ],
+  "legacy_source_excluded": true,
+  "summary": {
+    "queries": 24,
+    "hits_at_3": 20
+  }
+}

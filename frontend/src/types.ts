@@ -76,6 +76,7 @@ export type Run = {
   result: {
     summary?: string;
     facts?: string[];
+    assumptions?: string[];
     reply?: string;
     missing_information?: string[];
     source_ids?: string[];

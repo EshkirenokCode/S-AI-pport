@@ -8,7 +8,7 @@ import httpx
 import jwt
 from fastapi import HTTPException, Request
 
-from app.fixtures import DOCUMENTS, SCENARIOS
+from app.fixtures import DOCUMENTS, SCENARIOS, document_family
 from app.settings import settings
 
 
@@ -137,8 +137,8 @@ async def create_workspace(db, lab, role):
             )
         for key, title, version, product, body in DOCUMENTS:
             await c.execute(
-                "INSERT INTO documents(id,tenant_id,source_key,title,version,product_version,body) VALUES(%s,%s,%s,%s,%s,%s,%s)",
-                (uuid4(), tenant, key, title, version, product, body),
+                "INSERT INTO documents(id,tenant_id,source_key,title,version,product_version,body,family) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)",
+                (uuid4(), tenant, key, title, version, product, body, document_family(key)),
             )
         response = await lab.client.post("/seed", json={"tenant_id": str(tenant), "accounts": accounts})
         response.raise_for_status()

@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from app.db import clean, js
 from app.policy import PolicyError, digest, proposal
+from app.retrieval import retrieve
 from app.schemas import TOOL_SCHEMAS
 from app.settings import settings
 
@@ -72,16 +73,12 @@ class ToolRegistry:
             return {key: state[key], "plan": state["plan"], "account_version": state["version"]}
         if name == "search_documentation":
             state = await self.lab.state(run["tenant_id"], ticket["account_id"])
-            rows = await self.db.all(
-                """SELECT id,source_key,title,version,body,
-                ts_rank(search,websearch_to_tsquery('english',%s)) AS rank FROM documents
-                WHERE tenant_id=%s AND product_version=%s AND search @@ websearch_to_tsquery('english',%s)
-                ORDER BY rank DESC,source_key LIMIT 3""",
-                (args["query"], run["tenant_id"], state["product_version"], args["query"]),
+            rows = await retrieve(
+                self.db, run["tenant_id"], state["product_version"], args["query"], ticket["family"]
             )
             return {
                 "documents": [{**r, "source_id": str(r["id"]), "excerpt": r["body"][:1100]} for r in rows],
-                "retrieval": "postgresql_fts_v1",
+                "retrieval": "postgresql_fts_topic_or_v2",
             }
         if name == "read_document":
             row = await self.db.one(

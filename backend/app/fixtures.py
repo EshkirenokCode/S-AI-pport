@@ -227,3 +227,11 @@ def account_state(account_id, tenant_id, scenario, company):
         delivery["event"]["error"] = "429"
         delivery["event"]["attempts"][0]["status"] = "429"
     return state
+
+
+def document_family(source_key: str) -> str:
+    return {
+        "billing-recovery": "billing",
+        "delivery-recovery": "integration",
+        "webhook-settings": "configuration",
+    }.get(source_key, "shared")

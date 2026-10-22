@@ -1,0 +1,74 @@
+{
+  "kind": "live_smoke",
+  "date": "2026-10-22T19:49:29.008050+00:00",
+  "prompt_version": "recorded per case",
+  "dataset": "three canonical synthetic cases; no accuracy claim",
+  "cases": [
+    {
+      "prompt_version": "support-v1.1",
+      "family": "billing",
+      "run_id": "c69cda91-bc6b-47cd-b54a-c0fac652e49f",
+      "proposal_status": "waiting_for_approval",
+      "status": "completed",
+      "verification": {
+        "plan": "Pro",
+        "verified": true,
+        "operation_id": "c70e91e5-1829-43b8-b12a-f5c88eaee885",
+        "account_version": 2,
+        "cancel_requested": false
+      },
+      "source_count": 4,
+      "error": null,
+      "model_calls": [
+        {
+          "model": "cohere/north-mini-code:free",
+          "input_tokens": 796,
+          "output_tokens": 132,
+          "cost": 0,
+          "duration_ms": 2388
+        },
+        {
+          "model": "cohere/north-mini-code:free",
+          "input_tokens": 844,
+          "output_tokens": 57,
+          "cost": 0,
+          "duration_ms": 1858
+        },
+        {
+          "model": "cohere/north-mini-code:free",
+          "input_tokens": 947,
+          "output_tokens": 111,
+          "cost": 0,
+          "duration_ms": 1705
+        },
+        {
+          "model": "cohere/north-mini-code:free",
+          "input_tokens": 1329,
+          "output_tokens": 30,
+          "cost": 0,
+          "duration_ms": 865
+        },
+        {
+          "model": "cohere/north-mini-code:free",
+          "input_tokens": 1570,
+          "output_tokens": 358,
+          "cost": 0,
+          "duration_ms": 2965
+        },
+        {
+          "model": "cohere/north-mini-code:free",
+          "input_tokens": 1851,
+          "output_tokens": 348,
+          "cost": 0,
+          "duration_ms": 3729
+        }
+      ],
+      "elapsed_seconds": 15.2,
+      "retrievals": [
+        "postgresql_fts_topic_or_v2"
+      ],
+      "mcp_used": true,
+      "tool_errors": []
+    }
+  ]
+}

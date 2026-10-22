@@ -30,7 +30,7 @@ def main():
     report = {
         "kind": "live_smoke",
         "date": datetime.now(UTC).isoformat(),
-        "prompt_version": "support-v1",
+        "prompt_version": "recorded per case",
         "dataset": "three canonical synthetic cases; no accuracy claim",
         "cases": [],
     }
@@ -55,6 +55,7 @@ def main():
                 ).raise_for_status()
                 run = wait(client, run["id"])
             item = {
+                "prompt_version": run["prompt_version"],
                 "family": family,
                 "run_id": run["id"],
                 "proposal_status": proposal_status,
@@ -64,6 +65,13 @@ def main():
                 "error": run["error"],
                 "model_calls": run["usage"],
                 "elapsed_seconds": round(time.monotonic() - started, 2),
+                "retrievals": sorted(
+                    {
+                        e["data"]["result"]["retrieval"]
+                        for e in run["events"]
+                        if e["data"].get("result", {}).get("retrieval")
+                    }
+                ),
                 "mcp_used": any(e["kind"] == "transport" for e in run["events"]),
                 "tool_errors": [
                     e["data"]["result"].get("error")

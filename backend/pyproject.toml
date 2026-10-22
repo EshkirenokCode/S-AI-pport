@@ -9,7 +9,7 @@ description = "Evidence-led SaaS support workspace"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115,<1", "uvicorn[standard]>=0.30,<1", "pydantic-settings>=2.6,<3",
-  "psycopg[binary,pool]>=3.2,<4", "httpx>=0.28,<1", "mcp>=1.12,<3",
+  "psycopg[binary,pool]>=3.2,<4", "httpx>=0.28,<1", "mcp>=2.3,<3",
 ]
 
 [project.optional-dependencies]
@@ -19,7 +19,7 @@ dev = ["pytest>=8,<10", "pytest-asyncio>=0.24,<2", "ruff>=0.9,<1"]
 include = ["app*"]
 
 [tool.setuptools.package-data]
-app = ["migrations/**/*.sql"]
+app = ["migrations/**/*.sql", "prompts/*.txt"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

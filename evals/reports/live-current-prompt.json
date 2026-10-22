@@ -1,0 +1,82 @@
+{
+  "kind": "live_smoke",
+  "date": "2026-10-22T19:44:45.780806+00:00",
+  "prompt_version": "recorded per case",
+  "dataset": "three canonical synthetic cases; no accuracy claim",
+  "cases": [
+    {
+      "prompt_version": "support-v1.1",
+      "family": "billing",
+      "run_id": "e7fa64b4-561a-4abe-8521-6ef303036c23",
+      "proposal_status": "needs_human",
+      "status": "needs_human",
+      "verification": null,
+      "source_count": 0,
+      "error": "Model call budget exhausted before a valid conclusion",
+      "model_calls": [
+        {
+          "model": "liquid/lfm-2.5-2.6b:free",
+          "input_tokens": 1129,
+          "output_tokens": 84,
+          "cost": 0,
+          "duration_ms": 27868
+        },
+        {
+          "model": "cohere/north-mini-code:free",
+          "input_tokens": 1078,
+          "output_tokens": 368,
+          "cost": 0,
+          "duration_ms": 6544
+        },
+        {
+          "model": "nvidia/nemotron-3.5-lightning:free",
+          "input_tokens": 2103,
+          "output_tokens": 49,
+          "cost": 0,
+          "duration_ms": 1845
+        },
+        {
+          "model": "liquid/lfm-2.5-2.6b:free",
+          "input_tokens": 1710,
+          "output_tokens": 464,
+          "cost": 0,
+          "duration_ms": 58003
+        },
+        {
+          "model": "cohere/north-mini-code:free",
+          "input_tokens": 1201,
+          "output_tokens": 36,
+          "cost": 0,
+          "duration_ms": 1386
+        },
+        {
+          "model": "poolside/laguna-s-2.1:free",
+          "input_tokens": 2062,
+          "output_tokens": 25,
+          "cost": 0,
+          "duration_ms": 14994
+        },
+        {
+          "model": "nvidia/nemotron-3.5-super-vl:free",
+          "input_tokens": 3330,
+          "output_tokens": 76,
+          "cost": 0,
+          "duration_ms": 5885
+        },
+        {
+          "model": "nvidia/nemotron-3.5-lightning:free",
+          "input_tokens": 3676,
+          "output_tokens": 806,
+          "cost": 0,
+          "duration_ms": 8896
+        }
+      ],
+      "elapsed_seconds": 126.72,
+      "mcp_used": true,
+      "tool_errors": [
+        "Read account, relevant API state, and the exact procedure before proposing",
+        "Action does not match ticket family"
+      ]
+    }
+  ]
+}

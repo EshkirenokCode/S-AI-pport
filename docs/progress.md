@@ -1,26 +1,32 @@
-# Implementation progress
+# Delivery progress
 
-## Foundation and billing vertical
+## Implemented
 
-- Product, architecture, contracts, permissions, threats and testing are recorded.
-- Isolated product/sandbox PostgreSQL databases and checksum-verified migrations run locally.
-- The API, durable worker, seven scoped tools and real stdio MCP transport are implemented.
-- The billing vertical was exercised over real HTTP: evidence → proposal → approval → one operation → a fresh Pro-access verification.
-- The React workspace builds successfully and the billing investigation/approval path was exercised in the browser.
-- Offline runs are explicitly labelled. The OpenRouter adapter allows only zero-price models with no paid fallback.
+- Three ticket families in one React workspace and one persisted execution model.
+- FastAPI API, PostgreSQL migrations/leases/checkpoints, a separate stateful HTTP laboratory, and idempotent operation receipts.
+- Seven scoped tools through real stdio MCP; immutable proposals, human decisions, fresh authorization/preconditions, and post-action verification.
+- Versioned full-text retrieval, exact source dialogs, separate facts/assumptions/missing information, editable replies, audit history, and usage.
+- Explicit offline provider and zero-price-only OpenRouter adapter. Prompt revisions are stored under backend/app/prompts and recorded on runs.
+- Docker Compose, isolated native startup, CI, operations/recovery/backup documentation, screenshots, and a recorded real browser walkthrough.
 
-## Live checkpoint
+## Verified
 
-The first OpenRouter free-router investigation invoked all six necessary tools and reached a grounded proposal awaiting approval. Six reported model calls cost $0. Full live completion and additional scenario validation are in progress.
+- 33 backend tests pass with real PostgreSQL, HTTP services, and MCP subprocesses.
+- Six browser tests pass, including all three families and mobile.
+- 36 deterministic workflow cases: expected outcomes match; no duplicate business effects. This is contract coverage, not LLM accuracy.
+- Retrieval baseline: 20/24 expected documents in the top three; the four lexical/paraphrase misses are retained in the report.
+- Three canonical live OpenRouter/MCP runs complete; billing and delivery repairs are approved and independently verified. The 15 reported model calls cost $0.
+- GitHub Actions application and container jobs pass, including an actual Compose billing repair.
+- Tracked files contain no provider credential. Commit author and committer identities are EshkirenokCode.
 
-## Next
+## Final checks
 
-Finish integration/security/recovery tests, validate the remaining workflows, measure retrieval and evaluations, and package reproducible startup and delivery materials.
+The additional negative live smoke set and current-prompt smoke report are being finalized. The final delivery commit will be checked in CI.
 
-## Live model and reliability
+## Deliberate limits
 
-- Real OpenRouter free-router smoke runs completed billing (6 model calls), integration delivery (5), and configuration (4). All reported costs were zero. Both repairs were re-read and verified; stdio MCP was used in each investigation. Reports are under evals/reports.
-- 33 backend tests pass using real PostgreSQL, separate HTTP services, and MCP subprocesses, including ambiguous-operation receipt reconciliation, role revocation, stale state, and exhausted recovery/deadline budgets.
-- 36 deterministic workflow evaluation cases pass (24 development, 12 holdout); no duplicate effects. This is contract coverage, not measured LLM accuracy.
-- Six browser tests passed: billing, integration, configuration, analyst role, permanent error, and mobile. Screenshots were captured from the real product.
-- Docker Compose and CI are prepared; container CI verification is pending.
+See limitations.md and evaluations.md. Retrieval is lexical; pgvector/semantic search, Stripe, public hosting, production sign-in, remote MCP OAuth, automatic retention, and scheduled backups are not included. Existing infrastructure and the published portfolio are unchanged.
+
+## Continue
+
+make setup; make dev. Optional live key goes only into the private .env. Public deployment is separate work in an isolated environment.

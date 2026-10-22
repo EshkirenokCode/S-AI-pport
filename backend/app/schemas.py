@@ -46,6 +46,7 @@ class Finish(Strict):
     disposition: Literal["resolved", "propose_action", "needs_human", "clarify"]
     summary: str = Field(min_length=10, max_length=2000)
     facts: list[str] = Field(default_factory=list, max_length=10)
+    assumptions: list[str] = Field(default_factory=list, max_length=8)
     missing_information: list[str] = Field(default_factory=list, max_length=8)
     source_ids: list[str] = Field(default_factory=list, max_length=16)
     reply: str = Field(min_length=10, max_length=4000)

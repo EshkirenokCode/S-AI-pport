@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from psycopg.errors import UniqueViolation
 
 from app.db import Database, clean, js
+from app.providers import PROMPT_VERSION
 from app.schemas import Decision, DemoSession, Draft, StartRun, Strict
 from app.services import LabClient, create_workspace, identity, rate_limit, read_delegation
 from app.settings import ROOT, settings
@@ -144,8 +145,8 @@ async def start(ticket_id: UUID, body: StartRun, request: Request, actor=Depends
         run_id = uuid4()
         try:
             await c.execute(
-                """INSERT INTO runs(id,tenant_id,ticket_id,actor_id,provider,deadline)
-                VALUES(%s,%s,%s,%s,%s,%s)""",
+                """INSERT INTO runs(id,tenant_id,ticket_id,actor_id,provider,deadline,prompt_version)
+                VALUES(%s,%s,%s,%s,%s,%s,%s)""",
                 (
                     run_id,
                     actor["tenant_id"],
@@ -153,6 +154,7 @@ async def start(ticket_id: UUID, body: StartRun, request: Request, actor=Depends
                     actor["id"],
                     provider,
                     datetime.now(UTC) + timedelta(seconds=cfg.run_timeout_seconds),
+                    PROMPT_VERSION,
                 ),
             )
         except UniqueViolation:

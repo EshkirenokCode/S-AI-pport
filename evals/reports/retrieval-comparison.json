@@ -1,0 +1,236 @@
+{
+  "kind": "retrieval_comparison",
+  "date": "2026-10-22T19:51:08.739584+00:00",
+  "limitation": "Three observed failure queries plus three authored holdout expansions; small synthetic corpus. Topic metadata is trusted ticket context, not model input.",
+  "queries": [
+    {
+      "query": "payment succeeded plan upgrade delivery failure",
+      "family": "billing",
+      "split": "development",
+      "expected": "billing-recovery",
+      "baseline": [],
+      "topic_or_fallback": [
+        "billing-recovery"
+      ],
+      "baseline_hit": false,
+      "improved_hit": true
+    },
+    {
+      "query": "billing event processing plan upgrade",
+      "family": "billing",
+      "split": "development",
+      "expected": "billing-recovery",
+      "baseline": [],
+      "topic_or_fallback": [
+        "billing-recovery"
+      ],
+      "baseline_hit": false,
+      "improved_hit": true
+    },
+    {
+      "query": "reprocess billing event procedure",
+      "family": "billing",
+      "split": "development",
+      "expected": "billing-recovery",
+      "baseline": [],
+      "topic_or_fallback": [
+        "billing-recovery"
+      ],
+      "baseline_hit": false,
+      "improved_hit": true
+    },
+    {
+      "query": "paid invoice entitlement account still free troubleshooting",
+      "family": "billing",
+      "split": "holdout",
+      "expected": "billing-recovery",
+      "baseline": [],
+      "topic_or_fallback": [
+        "billing-recovery",
+        "permissions"
+      ],
+      "baseline_hit": false,
+      "improved_hit": true
+    },
+    {
+      "query": "webhook destination transient unavailable troubleshooting",
+      "family": "integration",
+      "split": "holdout",
+      "expected": "delivery-recovery",
+      "baseline": [],
+      "topic_or_fallback": [
+        "delivery-recovery"
+      ],
+      "baseline_hit": false,
+      "improved_hit": true
+    },
+    {
+      "query": "where configure endpoint retries policy tutorial",
+      "family": "configuration",
+      "split": "holdout",
+      "expected": "webhook-settings",
+      "baseline": [],
+      "topic_or_fallback": [
+        "webhook-settings"
+      ],
+      "baseline_hit": false,
+      "improved_hit": true
+    }
+  ],
+  "original_queries": [
+    {
+      "query": "paid subscription",
+      "expected": "billing-recovery",
+      "baseline_hit": true,
+      "improved_hit": true
+    },
+    {
+      "query": "billing event failed",
+      "expected": "billing-recovery",
+      "baseline_hit": true,
+      "improved_hit": true
+    },
+    {
+      "query": "payment succeeded Free",
+      "expected": "billing-recovery",
+      "baseline_hit": true,
+      "improved_hit": true
+    },
+    {
+      "query": "reprocess billing event",
+      "expected": "billing-recovery",
+      "baseline_hit": true,
+      "improved_hit": true
+    },
+    {
+      "query": "missing invoice event",
+      "expected": "billing-recovery",
+      "baseline_hit": true,
+      "improved_hit": true
+    },
+    {
+      "query": "entitlements Pro",
+      "expected": "billing-recovery",
+      "baseline_hit": true,
+      "improved_hit": true
+    },
+    {
+      "query": "payment pending",
+      "expected": "billing-recovery",
+      "baseline_hit": true,
+      "improved_hit": true
+    },
+    {
+      "query": "verify entitlement",
+      "expected": "billing-recovery",
+      "baseline_hit": true,
+      "improved_hit": true
+    },
+    {
+      "query": "webhook deliveries",
+      "expected": "delivery-recovery",
+      "baseline_hit": true,
+      "improved_hit": true
+    },
+    {
+      "query": "integration unauthorized",
+      "expected": "delivery-recovery",
+      "baseline_hit": true,
+      "improved_hit": true
+    },
+    {
+      "query": "destination acknowledgement",
+      "expected": "delivery-recovery",
+      "baseline_hit": true,
+      "improved_hit": true
+    },
+    {
+      "query": "retry delivery cooldown",
+      "expected": "delivery-recovery",
+      "baseline_hit": true,
+      "improved_hit": true
+    },
+    {
+      "query": "429 retry_after",
+      "expected": "delivery-recovery",
+      "baseline_hit": true,
+      "improved_hit": true
+    },
+    {
+      "query": "credentials configuration",
+      "expected": "delivery-recovery",
+      "baseline_hit": true,
+      "improved_hit": true
+    },
+    {
+      "query": "configure webhook retries",
+      "expected": "webhook-settings",
+      "baseline_hit": true,
+      "improved_hit": true
+    },
+    {
+      "query": "Retry attempts",
+      "expected": "webhook-settings",
+      "baseline_hit": true,
+      "improved_hit": true
+    },
+    {
+      "query": "Delivery policy",
+      "expected": "webhook-settings",
+      "baseline_hit": true,
+      "improved_hit": true
+    },
+    {
+      "query": "exponential backoff",
+      "expected": "webhook-settings",
+      "baseline_hit": true,
+      "improved_hit": true
+    },
+    {
+      "query": "support roles approvals",
+      "expected": "permissions",
+      "baseline_hit": true,
+      "improved_hit": true
+    },
+    {
+      "query": "immutable repair proposal",
+      "expected": "permissions",
+      "baseline_hit": true,
+      "improved_hit": true
+    },
+    {
+      "query": "my upgrade vanished",
+      "expected": "billing-recovery",
+      "baseline_hit": false,
+      "improved_hit": false
+    },
+    {
+      "query": "events are stuck in transit",
+      "expected": "delivery-recovery",
+      "baseline_hit": false,
+      "improved_hit": true
+    },
+    {
+      "query": "where are the resend options",
+      "expected": "webhook-settings",
+      "baseline_hit": false,
+      "improved_hit": false
+    },
+    {
+      "query": "who can authorize remediation",
+      "expected": "permissions",
+      "baseline_hit": false,
+      "improved_hit": false
+    }
+  ],
+  "summary": {
+    "queries": 6,
+    "baseline_hits_at_3": 0,
+    "improved_hits_at_3": 6
+  },
+  "original_summary": {
+    "queries": 24,
+    "baseline_hits_at_3": 20,
+    "improved_hits_at_3": 21
+  }
+}

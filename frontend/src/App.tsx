@@ -216,7 +216,9 @@ export default function App() {
             if (!draftDirty.current) setDraft(r.result.reply || "");
           }
         }
-        if (["completed", "needs_human", "failed", "cancelled"].includes(r.status)) {
+        if (
+          ["completed", "needs_human", "failed", "cancelled"].includes(r.status)
+        ) {
           clearInterval(timer);
           es.close();
         }
@@ -893,6 +895,14 @@ export default function App() {
                                   ))}
                                 </ul>
                               ) : null}
+                              {run.result.assumptions?.length ? (
+                                <div className="missing-info">
+                                  <strong>Not yet established</strong>
+                                  {run.result.assumptions.map((item, i) => (
+                                    <p key={i}>{item}</p>
+                                  ))}
+                                </div>
+                              ) : null}
                               {run.result.missing_information?.length ? (
                                 <div className="missing-info">
                                   <strong>Still needed</strong>
@@ -1021,7 +1031,7 @@ export default function App() {
                               </details>
                             </div>
                           )}
-                          {run.result.reply && !busy(run) && (
+                          {run.result.reply !== undefined && !busy(run) && (
                             <div className="reply-card">
                               <div className="reply-heading">
                                 <h3>
@@ -1048,9 +1058,7 @@ export default function App() {
                                   className="text-button"
                                   onClick={() => {
                                     void navigator.clipboard
-                                      .writeText(
-                                        draft,
-                                      )
+                                      .writeText(draft)
                                       .then(() => {
                                         setCopied(true);
                                         setTimeout(

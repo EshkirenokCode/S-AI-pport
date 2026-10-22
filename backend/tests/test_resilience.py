@@ -174,3 +174,26 @@ async def test_http_read_retry_classification():
         assert len(calls) == 1
     finally:
         await lab.close()
+
+
+def test_long_query_fallback_uses_trusted_ticket_topic(client, stack):
+    import asyncio
+
+    from app.db import Database
+    from app.retrieval import retrieve
+
+    tenant = client.get("/api/session").json()["tenant_id"]
+
+    async def check():
+        db = Database(stack.env["DATABASE_URL"])
+        await db.open()
+        try:
+            query = "payment succeeded plan upgrade delivery failure"
+            assert not await retrieve(db, tenant, "2.4", query, baseline=True)
+            rows = await retrieve(db, tenant, "2.4", query, "billing")
+            assert "billing-recovery" in {r["source_key"] for r in rows}
+            assert not {"delivery-recovery", "webhook-settings"} & {r["source_key"] for r in rows}
+        finally:
+            await db.close()
+
+    asyncio.run(check())

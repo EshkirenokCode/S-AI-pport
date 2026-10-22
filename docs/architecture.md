@@ -40,7 +40,7 @@ An external action uses the immutable proposal ID as its idempotency key. A rece
 
 ## Retrieval
 
-Start with a measured PostgreSQL full-text baseline. Source references identify document key, version, and exact excerpt. Applicability is checked against product version. Semantic retrieval is optional and must be compared to this baseline before being enabled. pgvector support is an enhancement, not a claim that lexical retrieval is semantic search.
+Start with a measured PostgreSQL full-text baseline. Source references identify document key, version, and exact excerpt. Applicability is checked against product version. Semantic retrieval and pgvector are deferred until a measured comparison justifies them; they are not implemented. The retrieval ADR records the observed baseline and its misses.
 
 ## Identity and tools
 

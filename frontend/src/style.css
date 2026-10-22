@@ -2449,41 +2449,141 @@ kbd,
 }
 
 /* Readable work-surface typography and a compact first-action composition. */
-.ticket-row h3 { font-size: 12px; color: #394632; }
-.ticket-row > p { font-size: 11px; color: #78816d; }
-.customer-name { font-size: 11px; }
-.family-tag, .ticket-status { font-size: 9px; }
-.customer-message > p { font-size: 13px; color: #69755e; }
-.context-heading h2 { font-size: 12px; }
-.context-facts dt, .context-facts dd { font-size: 10px; }
-.boundary strong { font-size: 10px; color: #6b8159; }
-.boundary p { font-size: 10px; color: #889776; }
-.investigation-intro { padding: 0 0 9px; }
-.intro-illustration { height: 57px; margin-bottom: 8px; }
-.intro-icon { width: 48px; height: 48px; border-radius: 13px; }
-.orbit-line { height: 45px; width: 120px; }
-.floating-check { right: 19px; top: -3px; }
-.floating-source { left: 21px; bottom: -2px; }
-.investigation-intro h3 { margin-top: 8px; }
-.investigation-intro > p { margin-top: 8px; line-height: 1.8; color: #7b8b6b; }
-.investigation-checklist { flex-direction: row; justify-content: center; gap: 15px; margin: 17px 0; font-size: 9px; }
-.investigation-checklist > span { max-width: 140px; text-align: left; line-height: 1.7; gap: 6px; }
-.provider-inline { margin-top: 11px; }
-.timeline-event strong { font-size: 11px; color: #617a4f; }
-.timeline-event p { font-size: 10px; color: #85986e; }
-.findings h3 { font-size: 13px; }
-.findings li { font-size: 11px; color: #78925f; }
-.action-top h3 { font-size: 12px; }
-.action-card > p, .reply-card textarea { font-size: 11px; }
+.ticket-row h3 {
+  font-size: 12px;
+  color: #394632;
+}
+.ticket-row > p {
+  font-size: 11px;
+  color: #78816d;
+}
+.customer-name {
+  font-size: 11px;
+}
+.family-tag,
+.ticket-status {
+  font-size: 9px;
+}
+.customer-message > p {
+  font-size: 13px;
+  color: #69755e;
+}
+.context-heading h2 {
+  font-size: 12px;
+}
+.context-facts dt,
+.context-facts dd {
+  font-size: 10px;
+}
+.boundary strong {
+  font-size: 10px;
+  color: #6b8159;
+}
+.boundary p {
+  font-size: 10px;
+  color: #889776;
+}
+.investigation-intro {
+  padding: 0 0 9px;
+}
+.intro-illustration {
+  height: 57px;
+  margin-bottom: 8px;
+}
+.intro-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 13px;
+}
+.orbit-line {
+  height: 45px;
+  width: 120px;
+}
+.floating-check {
+  right: 19px;
+  top: -3px;
+}
+.floating-source {
+  left: 21px;
+  bottom: -2px;
+}
+.investigation-intro h3 {
+  margin-top: 8px;
+}
+.investigation-intro > p {
+  margin-top: 8px;
+  line-height: 1.8;
+  color: #7b8b6b;
+}
+.investigation-checklist {
+  flex-direction: row;
+  justify-content: center;
+  gap: 15px;
+  margin: 17px 0;
+  font-size: 9px;
+}
+.investigation-checklist > span {
+  max-width: 140px;
+  text-align: left;
+  line-height: 1.7;
+  gap: 6px;
+}
+.provider-inline {
+  margin-top: 11px;
+}
+.timeline-event strong {
+  font-size: 11px;
+  color: #617a4f;
+}
+.timeline-event p {
+  font-size: 10px;
+  color: #85986e;
+}
+.findings h3 {
+  font-size: 13px;
+}
+.findings li {
+  font-size: 11px;
+  color: #78925f;
+}
+.action-top h3 {
+  font-size: 12px;
+}
+.action-card > p,
+.reply-card textarea {
+  font-size: 11px;
+}
 @media (max-width: 720px) {
- .ticket-row h3 { font-size: 13px; }
- .customer-message > p { font-size: 12px; }
- .investigation-intro { padding: 6px 0 12px; }
- .intro-illustration { height: 64px; }
- .investigation-checklist { flex-direction: column; gap: 8px; margin: 17px 0; }
- .investigation-checklist > span { max-width: none; }
- .timeline-event strong { font-size: 10px; }
- .findings h3 { font-size: 12px; }
- .findings li { font-size: 10px; }
- .action-top h3 { font-size: 11px; }
+  .ticket-row h3 {
+    font-size: 13px;
+  }
+  .customer-message > p {
+    font-size: 12px;
+  }
+  .investigation-intro {
+    padding: 6px 0 12px;
+  }
+  .intro-illustration {
+    height: 64px;
+  }
+  .investigation-checklist {
+    flex-direction: column;
+    gap: 8px;
+    margin: 17px 0;
+  }
+  .investigation-checklist > span {
+    max-width: none;
+  }
+  .timeline-event strong {
+    font-size: 10px;
+  }
+  .findings h3 {
+    font-size: 12px;
+  }
+  .findings li {
+    font-size: 10px;
+  }
+  .action-top h3 {
+    font-size: 11px;
+  }
 }

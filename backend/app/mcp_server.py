@@ -65,6 +65,7 @@ async def finish_investigation(
     missing_information: list[str],
     source_ids: list[str],
     reply: str,
+    assumptions: list[str] | None = None,
 ) -> dict:
     """Save a structured conclusion with exact evidence references."""
     return await forward(
@@ -73,6 +74,7 @@ async def finish_investigation(
             "disposition": disposition,
             "summary": summary,
             "facts": facts,
+            "assumptions": assumptions or [],
             "missing_information": missing_information,
             "source_ids": source_ids,
             "reply": reply,
