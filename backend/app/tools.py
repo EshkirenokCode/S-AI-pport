@@ -1,4 +1,5 @@
 import time
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from pydantic import ValidationError
@@ -29,6 +30,8 @@ class ToolRegistry:
                 or fresh["status"] != "running"
                 or fresh["phase"] != "investigate"
                 or fresh["cancel_requested"]
+                or fresh["lease_owner"] != run["lease_owner"]
+                or fresh["deadline"] < datetime.now(UTC)
             ):
                 raise PolicyError("Investigation is no longer active")
             n = await self.db.one(
@@ -125,7 +128,8 @@ class ToolRegistry:
             payload = proposal(state, args["kind"], args["target_id"])
             action = await self.db.one(
                 """INSERT INTO actions(id,tenant_id,run_id,kind,target_id,payload,digest)
-                VALUES(%s,%s,%s,%s,%s,%s,%s) ON CONFLICT(run_id) DO UPDATE SET status=actions.status RETURNING *""",
+                SELECT %s,%s,%s,%s,%s,%s,%s FROM runs WHERE id=%s AND lease_owner=%s
+                AND status='running' AND NOT cancel_requested ON CONFLICT(run_id) DO UPDATE SET status=actions.status RETURNING *""",
                 (
                     uuid4(),
                     run["tenant_id"],
@@ -134,8 +138,12 @@ class ToolRegistry:
                     args["target_id"],
                     js(payload),
                     digest(payload),
+                    run["id"],
+                    run["lease_owner"],
                 ),
             )
+            if not action:
+                raise PolicyError("Investigation is no longer active")
             return {
                 "proposal": action,
                 "notice": "Proposed only. A human operator must approve; no repair has executed.",
@@ -178,9 +186,12 @@ class ToolRegistry:
                     e["data"]["tool"] == "read_document" for e in events
                 ):
                     raise PolicyError("A configuration answer requires an applicable document read")
-            await self.db.execute(
-                "UPDATE runs SET result=%s WHERE id=%s AND tenant_id=%s",
-                (js(args), run["id"], run["tenant_id"]),
+            accepted = await self.db.one(
+                """UPDATE runs SET result=%s WHERE id=%s AND tenant_id=%s AND lease_owner=%s
+                AND status='running' AND NOT cancel_requested RETURNING id""",
+                (js(args), run["id"], run["tenant_id"], run["lease_owner"]),
             )
+            if not accepted:
+                raise PolicyError("Investigation is no longer active")
             return {"accepted": True, "disposition": args["disposition"]}
         raise PolicyError("Unknown tool")

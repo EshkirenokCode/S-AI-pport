@@ -63,6 +63,7 @@ def stack():
         "MODEL_PROVIDER": "deterministic",
         "TOOL_TRANSPORT": "mcp",
         "SESSION_LIMIT_PER_HOUR": "1000",
+        "GLOBAL_SESSIONS_PER_HOUR": "10000",
         "RUN_TIMEOUT_SECONDS": "90",
         "LEASE_SECONDS": "6",
     }

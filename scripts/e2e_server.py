@@ -36,6 +36,7 @@ env = {
     "OPENROUTER_API_KEY": "",
     "TOOL_TRANSPORT": "mcp",
     "SESSION_LIMIT_PER_HOUR": "1000",
+    "GLOBAL_SESSIONS_PER_HOUR": "10000",
     "APP_SECRET": secrets.token_hex(32),
     "SANDBOX_TOKEN": secrets.token_hex(32),
 }

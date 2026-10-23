@@ -223,9 +223,10 @@ def test_unknown_and_malformed_tools_are_rejected(client, stack):
     try:
         rid = client.post("/api/tickets/" + ticket["id"] + "/runs", json={}).json()["id"]
         with psycopg.connect(stack.env["DATABASE_URL"], autocommit=True) as c:
+            lease = uuid4()
             c.execute(
                 "UPDATE runs SET status='running',lease_owner=%s,lease_until=now()+interval '20 seconds' WHERE id=%s",
-                (uuid4(), rid),
+                (lease, rid),
             )
             tenant, actor = c.execute("SELECT tenant_id,actor_id FROM runs WHERE id=%s", (rid,)).fetchone()
         import time
@@ -235,6 +236,7 @@ def test_unknown_and_malformed_tools_are_rejected(client, stack):
         token = jwt.encode(
             {
                 "scope": "tools",
+                "lease": str(lease),
                 "tenant": str(tenant),
                 "actor": str(actor),
                 "run": rid,

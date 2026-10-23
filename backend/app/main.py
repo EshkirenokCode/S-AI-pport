@@ -44,6 +44,11 @@ async def security(request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "same-origin"
     response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; font-src 'self'; connect-src 'self'; "
+        "frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    )
     if request.url.path.startswith("/api"):
         response.headers["Cache-Control"] = "no-store"
     return response
@@ -66,6 +71,7 @@ async def ready(request: Request):
 async def demo(body: DemoSession, request: Request, response: Response):
     ip = hashlib.sha256((request.client.host if request.client else "unknown").encode()).hexdigest()
     await rate_limit(request.app.state.db, "session:" + ip, cfg.session_limit_per_hour)
+    await rate_limit(request.app.state.db, "session:global", cfg.global_sessions_per_hour)
     token, tenant = await create_workspace(request.app.state.db, request.app.state.lab, body.role)
     response.set_cookie(
         "saipport_session",
@@ -132,6 +138,12 @@ async def start(ticket_id: UUID, body: StartRun, request: Request, actor=Depends
     if provider == "openrouter" and not cfg.openrouter_api_key.get_secret_value():
         raise HTTPException(503, "OpenRouter key is not configured. Offline mode remains available.")
     async with db.pool.connection() as c, c.transaction():
+        await c.execute("SELECT pg_advisory_xact_lock(928104)")
+        global_count = await (
+            await c.execute("SELECT count(*) AS n FROM runs WHERE status IN ('queued','running')")
+        ).fetchone()
+        if global_count["n"] >= cfg.global_active_runs:
+            raise HTTPException(429, "The demo is busy. Try again in a moment.")
         await c.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (str(actor["tenant_id"]),))
         counts = await (
             await c.execute(
@@ -142,6 +154,9 @@ async def start(ticket_id: UUID, body: StartRun, request: Request, actor=Depends
         ).fetchone()
         if counts["total"] >= cfg.runs_per_tenant or counts["active"] >= 3:
             raise HTTPException(429, "Workspace run quota reached")
+        await c.execute(
+            "UPDATE tickets SET status='open' WHERE id=%s AND tenant_id=%s", (ticket_id, actor["tenant_id"])
+        )
         run_id = uuid4()
         try:
             await c.execute(
@@ -227,6 +242,8 @@ async def cancel(run_id: UUID, request: Request, actor=Depends(identity)):
         ).fetchone()
         if not run:
             raise HTTPException(404, "Run not found")
+        if run["cancel_requested"] or run["status"] not in ("queued", "running", "waiting_for_approval"):
+            return {"cancel_requested": run["cancel_requested"], "status": run["status"]}
         if run["status"] in ("queued", "running", "waiting_for_approval"):
             # An in-flight external effect must still be reconciled by the executor.
             executing = run["status"] == "running" and run["phase"] == "execute"
@@ -238,6 +255,11 @@ async def cancel(run_id: UUID, request: Request, actor=Depends(identity)):
                 "UPDATE actions SET status='cancelled' WHERE run_id=%s AND status IN ('pending','approved')",
                 (run_id,),
             )
+            if not executing:
+                await c.execute(
+                    "UPDATE tickets SET status='open' WHERE id=%s AND tenant_id=%s",
+                    (run["ticket_id"], actor["tenant_id"]),
+                )
     await db.event(run, "cancelled", "Cancellation requested")
     await db.audit(actor["tenant_id"], actor["id"], "investigation.cancelled", run_id, run_id)
     return {"cancel_requested": True}
@@ -283,14 +305,28 @@ async def decide(action_id: UUID, body: Decision, request: Request, actor=Depend
         )
         await c.execute(
             """UPDATE runs SET status=%s,phase=%s,lease_owner=NULL,lease_until=NULL,
-            deadline=now()+%s*interval '1 second',attempts=0 WHERE id=%s""",
+            deadline=now()+%s*interval '1 second',attempts=0,
+            finished_at=CASE WHEN %s THEN now() ELSE NULL END WHERE id=%s""",
             (
                 "queued" if wanted == "approved" else "needs_human",
                 "execute",
                 cfg.run_timeout_seconds,
+                wanted == "rejected",
                 run["id"],
             ),
         )
+        if wanted == "rejected":
+            result = {
+                **run["result"],
+                "disposition": "needs_human",
+                "summary": "The proposed repair was declined. No operation was executed; human review is required.",
+                "reply": "We reviewed the account issue and have escalated it for further investigation. No repair or additional charge was made.",
+            }
+            await c.execute("UPDATE runs SET result=%s WHERE id=%s", (js(result), run["id"]))
+            await c.execute(
+                "UPDATE tickets SET status='needs_human' WHERE id=%s AND tenant_id=%s",
+                (run["ticket_id"], actor["tenant_id"]),
+            )
     await db.event(
         run,
         "approval",
@@ -303,12 +339,22 @@ async def decide(action_id: UUID, body: Decision, request: Request, actor=Depend
 
 @app.patch("/api/runs/{run_id}/draft")
 async def draft(run_id: UUID, body: Draft, request: Request, actor=Depends(identity)):
-    row = await request.app.state.db.one(
-        "UPDATE runs SET result=jsonb_set(result,'{reply}',%s) WHERE id=%s AND tenant_id=%s RETURNING id",
-        (js(body.reply), run_id, actor["tenant_id"]),
-    )
-    if not row:
-        raise HTTPException(404, "Run not found")
+    db = request.app.state.db
+    async with db.pool.connection() as c, c.transaction():
+        row = await (
+            await c.execute(
+                "SELECT status,result FROM runs WHERE id=%s AND tenant_id=%s FOR UPDATE",
+                (run_id, actor["tenant_id"]),
+            )
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "Run not found")
+        if row["status"] in ("queued", "running") or "reply" not in row["result"]:
+            raise HTTPException(409, "Wait for investigation findings before editing the reply")
+        await c.execute(
+            "UPDATE runs SET result=jsonb_set(result,'{reply}',%s) WHERE id=%s AND tenant_id=%s",
+            (js(body.reply), run_id, actor["tenant_id"]),
+        )
     return {"saved": True}
 
 
@@ -352,8 +398,9 @@ async def internal(body: ToolCall, request: Request, authorization: str = Header
     context = read_delegation(authorization.removeprefix("Bearer "))
     run = await request.app.state.db.one(
         """SELECT r.* FROM runs r JOIN actors a ON a.id=r.actor_id AND a.tenant_id=r.tenant_id
-        WHERE r.id=%s AND r.tenant_id=%s AND r.actor_id=%s""",
-        (context["run"], context["tenant"], context["actor"]),
+        WHERE r.id=%s AND r.tenant_id=%s AND r.actor_id=%s AND r.lease_owner=%s
+        AND r.lease_until>now() AND r.status='running' AND NOT r.cancel_requested""",
+        (context["run"], context["tenant"], context["actor"], context["lease"]),
     )
     if not run:
         raise HTTPException(404, "Run context not found")

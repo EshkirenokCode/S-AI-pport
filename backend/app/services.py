@@ -2,7 +2,7 @@ import asyncio
 import hashlib
 import secrets
 from datetime import UTC, datetime, timedelta
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import httpx
 import jwt
@@ -83,6 +83,7 @@ def delegate(run):
             "run": str(run["id"]),
             "tenant": str(run["tenant_id"]),
             "actor": str(run["actor_id"]),
+            "lease": str(run["lease_owner"]),
             "exp": datetime.now(UTC) + timedelta(seconds=settings().run_timeout_seconds + 30),
         },
         settings().app_secret.get_secret_value(),
@@ -96,12 +97,14 @@ def read_delegation(token):
             token,
             settings().app_secret.get_secret_value(),
             algorithms=["HS256"],
-            options={"require": ["scope", "run", "tenant", "actor", "exp"]},
+            options={"require": ["scope", "run", "tenant", "actor", "lease", "exp"]},
         )
         if result["scope"] != "tools":
             raise ValueError("Invalid scope")
+        for key in ("run", "tenant", "actor", "lease"):
+            UUID(result[key])
         return result
-    except (jwt.PyJWTError, ValueError) as e:
+    except (jwt.PyJWTError, ValueError, TypeError, AttributeError) as e:
         raise HTTPException(401, "Invalid delegated context") from e
 
 

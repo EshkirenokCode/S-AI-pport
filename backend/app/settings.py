@@ -25,6 +25,8 @@ class Settings(BaseSettings):
         "http://localhost:5173,http://127.0.0.1:5173,http://localhost:8000,http://127.0.0.1:8000"
     )
     session_limit_per_hour: int = 20
+    global_sessions_per_hour: int = 100
+    global_active_runs: int = 20
     runs_per_tenant: int = 40
     live_calls_per_day: int = 40
     run_timeout_seconds: int = 240

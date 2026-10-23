@@ -3,6 +3,7 @@ import json
 import logging
 import signal
 import sys
+import time
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from uuid import uuid4
@@ -12,6 +13,7 @@ from fastapi import HTTPException
 from mcp import Client, StdioServerParameters
 
 from app.db import Database, clean, js
+from app.maintenance import expire_workspaces
 from app.policy import PolicyError, digest, eligible
 from app.providers import SYSTEM_PROMPT, live_next, offline_next
 from app.services import LabClient, delegate
@@ -80,20 +82,45 @@ class Worker:
             )
 
     async def finish(self, run, status, error=None):
-        if status in ("needs_human", "failed", "cancelled"):
-            await self.db.execute(
-                "UPDATE actions SET status=%s WHERE run_id=%s AND status='approved'",
-                ("cancelled" if status == "cancelled" else "failed", run["id"]),
+        async with self.db.pool.connection() as c, c.transaction():
+            current = await (
+                await c.execute(
+                    "SELECT id FROM runs WHERE id=%s AND lease_owner=%s AND status='running' FOR UPDATE",
+                    (run["id"], self.owner),
+                )
+            ).fetchone()
+            if not current:
+                return
+            if status in ("needs_human", "failed", "cancelled"):
+                await c.execute(
+                    "UPDATE actions SET status=%s WHERE run_id=%s AND status IN ('pending','approved')",
+                    ("cancelled" if status == "cancelled" else "failed", run["id"]),
+                )
+                await c.execute(
+                    "UPDATE actions SET status='unknown' WHERE run_id=%s AND status='executing'", (run["id"],)
+                )
+            await c.execute(
+                """UPDATE runs SET status=%s,error=%s,lease_owner=NULL,lease_until=NULL,
+                finished_at=CASE WHEN %s THEN now() ELSE NULL END WHERE id=%s""",
+                (status, error, status in TERMINAL, run["id"]),
             )
-            await self.db.execute(
-                "UPDATE actions SET status='unknown' WHERE run_id=%s AND status='executing'", (run["id"],)
+            await c.execute(
+                "UPDATE tickets SET status=%s WHERE id=%s AND tenant_id=%s",
+                (
+                    "resolved" if status == "completed" else "open" if status == "cancelled" else status,
+                    run["ticket_id"],
+                    run["tenant_id"],
+                ),
             )
-        await self.db.execute(
-            """UPDATE runs SET status=%s,error=%s,lease_owner=NULL,lease_until=NULL,
-            finished_at=CASE WHEN %s THEN now() ELSE NULL END WHERE id=%s AND lease_owner=%s""",
-            (status, error, status in TERMINAL, run["id"], self.owner),
-        )
-        await self.db.event(run, "state", "Investigation " + status.replace("_", " "), {"status": status})
+            await c.execute(
+                "INSERT INTO events(tenant_id,run_id,kind,title,data) VALUES(%s,%s,'state',%s,%s)",
+                (
+                    run["tenant_id"],
+                    run["id"],
+                    "Investigation " + status.replace("_", " "),
+                    js({"status": status}),
+                ),
+            )
 
     @asynccontextmanager
     async def transport(self, run):
@@ -278,6 +305,7 @@ class Worker:
             "operation_id": str(action["id"]),
             "cancel_requested": row["cancel_requested"],
         }
+        result["disposition"] = "resolved" if verified else "needs_human"
         if verified:
             result["facts"] = ["Before repair: " + fact for fact in result.get("facts", [])]
             result["facts"].append(
@@ -315,10 +343,6 @@ class Worker:
             "action.verified" if verified else "action.verification_failed",
             action["id"],
             run["id"],
-        )
-        await self.db.execute(
-            "UPDATE tickets SET status=%s WHERE id=%s AND tenant_id=%s",
-            ("resolved" if verified else "needs_human", run["ticket_id"], run["tenant_id"]),
         )
         await self.finish(run, "completed" if verified else "needs_human")
 
@@ -367,8 +391,15 @@ class Worker:
 
     async def serve(self):
         await self.open()
+        next_maintenance = 0.0
         try:
             while not self.stopping.is_set():
+                if time.monotonic() >= next_maintenance:
+                    try:
+                        await expire_workspaces(self.db, self.lab)
+                    except Exception as e:
+                        log.warning("retention error_type=%s", type(e).__name__)
+                    next_maintenance = time.monotonic() + 600
                 run = await self.claim()
                 if run:
                     task = asyncio.create_task(self.process(run))

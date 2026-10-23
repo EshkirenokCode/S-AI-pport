@@ -97,9 +97,10 @@ def test_unknown_evidence_and_wrong_source_version(client, stack):
         rid = client.post("/api/tickets/" + ticket["id"] + "/runs", json={}).json()["id"]
         with psycopg.connect(stack.env["DATABASE_URL"], autocommit=True) as c:
             tenant, actor = c.execute("SELECT tenant_id,actor_id FROM runs WHERE id=%s", (rid,)).fetchone()
+            lease = uuid4()
             c.execute(
                 "UPDATE runs SET status='running',lease_owner=%s,lease_until=now()+interval '20 seconds' WHERE id=%s",
-                (uuid4(), rid),
+                (lease, rid),
             )
             old = str(
                 c.execute(
@@ -109,6 +110,7 @@ def test_unknown_evidence_and_wrong_source_version(client, stack):
         token = jwt.encode(
             {
                 "scope": "tools",
+                "lease": str(lease),
                 "tenant": str(tenant),
                 "actor": str(actor),
                 "run": rid,

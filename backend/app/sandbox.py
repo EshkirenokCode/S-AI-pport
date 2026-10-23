@@ -82,6 +82,14 @@ async def receipt(tenant: UUID, operation: UUID):
     return row["result"]
 
 
+@app.delete("/tenants/{tenant}")
+async def expire_tenant(tenant: UUID):
+    async with db.pool.connection() as c, c.transaction():
+        await c.execute("DELETE FROM receipts WHERE tenant_id=%s", (tenant,))
+        await c.execute("DELETE FROM accounts WHERE tenant_id=%s", (tenant,))
+    return {"removed": True}
+
+
 @app.post("/operations")
 async def operate(body: Operation):
     payload_hash = digest(body.model_dump(mode="json"))
