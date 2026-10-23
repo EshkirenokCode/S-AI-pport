@@ -173,6 +173,8 @@ def test_cancel_waiting_invalidates_proposal(client):
     client.post("/api/runs/" + run["id"] + "/cancel").raise_for_status()
     cancelled = client.get("/api/runs/" + run["id"]).json()
     assert cancelled["status"] == "cancelled"
+    assert "cancelled" in cancelled["result"]["summary"]
+    assert "awaiting" not in cancelled["result"]["reply"]
     a = cancelled["actions"][0]
     assert a["status"] == "cancelled"
     assert (

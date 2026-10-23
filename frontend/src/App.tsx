@@ -148,6 +148,7 @@ export default function App() {
     [contextOpen, setContextOpen] = useState(false);
   const booted = useRef(false),
     draftDirty = useRef(false),
+    draftRevision = useRef(0),
     selectedRef = useRef(selected),
     draftRef = useRef(draft);
   draftRef.current = draft;
@@ -249,6 +250,7 @@ export default function App() {
     const refresh = async () => {
       if (refreshing || !active) return;
       refreshing = true;
+      const revision = draftRevision.current;
       try {
         const r = await api<Run>("/runs/" + runId);
         if (!active) return;
@@ -259,7 +261,8 @@ export default function App() {
           const d = await api<NonNullable<typeof detail>>("/tickets/" + tid);
           if (active) {
             setDetail(d);
-            if (!draftDirty.current) setDraft(r.result.reply || "");
+            if (!draftDirty.current && draftRevision.current === revision)
+              setDraft(r.result.reply || "");
           }
         }
         if (
@@ -301,6 +304,7 @@ export default function App() {
   async function start() {
     if (!detail) return;
     const ticketId = detail.ticket.id;
+    setRun(null);
     setPending(true);
     setError("");
     setDraft("");
@@ -376,6 +380,7 @@ export default function App() {
       });
       if (selectedRef.current === ticketId && draftRef.current === text) {
         setSaved(true);
+        draftRevision.current++;
         draftDirty.current = false;
         try {
           sessionStorage.removeItem("saipport:draft:" + runId);
@@ -1253,6 +1258,7 @@ export default function App() {
                                   } catch {
                                     /* Optional storage. */
                                   }
+                                  draftRevision.current++;
                                   draftDirty.current = true;
                                   setSaved(false);
                                 }}

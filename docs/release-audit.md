@@ -8,7 +8,7 @@ Reviewed on 23 October 2026: application/API routes, schemas, permissions, worke
 | --- | --- | --- |
 | Completed answers left tickets open | The owning worker commits run and ticket status together | `test_completed_answer_resolves_ticket` |
 | Decline retained an awaiting-approval conclusion | Store a final review disposition, revised draft, and completion time | Backend and browser decline checks |
-| Cancelling finished runs wrote false cancellation records | Terminal/repeated cancellation returns the existing state | `test_finished_cancel_is_noop` |
+| Cancellation wrote false records or retained an approval draft | Terminal/repeated cancellation returns the existing state; cancelled proposals get a final conclusion | `test_finished_cancel_is_noop` |
 | In-progress draft writes could be overwritten | Reject writes before findings; audit accepted saves | `test_draft_rejected_before_conclusion` |
 | Browser responses could target the newly selected ticket | Bind mutation responses to their original ticket/run | Browser switching/draft regression |
 | Unsaved edits vanished on navigation/reload | Keep per-run edits in tab-scoped session storage until explicitly saved | Browser draft recovery check |

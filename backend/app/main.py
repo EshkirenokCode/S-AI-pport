@@ -256,6 +256,14 @@ async def cancel(run_id: UUID, request: Request, actor=Depends(identity)):
                 (run_id,),
             )
             if not executing:
+                if run["result"].get("summary"):
+                    result = {
+                        **run["result"],
+                        "disposition": "needs_human",
+                        "summary": "The investigation was cancelled before a repair was executed.",
+                        "reply": "The investigation was cancelled. No repair was made during this run; the case is available for manual review.",
+                    }
+                    await c.execute("UPDATE runs SET result=%s WHERE id=%s", (js(result), run_id))
                 await c.execute(
                     "UPDATE tickets SET status='open' WHERE id=%s AND tenant_id=%s",
                     (run["ticket_id"], actor["tenant_id"]),
