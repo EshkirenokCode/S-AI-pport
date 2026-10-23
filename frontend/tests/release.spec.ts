@@ -151,3 +151,31 @@ test("workspace, approval and settings meet automated WCAG A/AA checks", async (
     .click();
   await check();
 });
+
+test("unavailable live access explains the deployment restriction", async ({
+  page,
+}) => {
+  await page.route("**/api/session", async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({
+      response,
+      json: {
+        ...(await response.json()),
+        live_available: false,
+        live_unavailable_reason:
+          "Provider access is unavailable from this deployment network.",
+      },
+    });
+  });
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Workspace settings", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toContainText(
+    "Provider access is unavailable from this deployment network.",
+  );
+  const provider = page.getByLabel("Investigation provider", { exact: true });
+  await provider.press("ArrowDown");
+  await provider.press("Enter");
+  await expect(provider).toHaveValue("deterministic");
+});

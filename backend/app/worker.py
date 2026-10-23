@@ -28,6 +28,30 @@ class InterruptedRun(Exception):
     pass
 
 
+def run_failure(error):
+    # MCP's task group can wrap the actual provider/policy exception.
+    while isinstance(error, ExceptionGroup):
+        error = error.exceptions[0]
+    if isinstance(error, InterruptedRun):
+        return "cancelled", None
+    if isinstance(error, (PolicyError, HTTPException)):
+        return "needs_human", str(error.detail) if isinstance(error, HTTPException) else str(error)
+    if isinstance(error, httpx.HTTPStatusError):
+        status = error.response.status_code
+        if error.request.url.host == "openrouter.ai":
+            messages = {
+                401: "OpenRouter did not accept the configured development key (HTTP 401). Offline mode remains available.",
+                403: "OpenRouter denied requests from this server (HTTP 403). Check provider access for this network. Offline mode remains available.",
+                429: "OpenRouter rate limit reached (HTTP 429). Retry later or use Offline mode.",
+            }
+            if status in messages:
+                return "needs_human", messages[status]
+        return "failed", f"Upstream HTTP {status}. No successful outcome was assumed."
+    if isinstance(error, (httpx.TransportError, TimeoutError)):
+        return "needs_human", "An upstream request timed out or was unreachable. The outcome is unverified."
+    return "failed", f"Investigation stopped: {type(error).__name__}. See the observable steps."
+
+
 class Worker:
     def __init__(self):
         self.cfg = settings()
@@ -366,33 +390,15 @@ class Worker:
             )
             async with asyncio.timeout(self.cfg.run_timeout_seconds):
                 await (self.investigate(run) if run["phase"] == "investigate" else self.execute(run))
-        except InterruptedRun:
-            fresh = await self.db.one("SELECT status FROM runs WHERE id=%s", (run["id"],))
-            if fresh["status"] == "running":
-                await self.finish(run, "cancelled")
-        except (PolicyError, HTTPException) as e:
-            message = str(e.detail) if isinstance(e, HTTPException) else str(e)
-            await self.finish(run, "needs_human", message)
-        except httpx.HTTPStatusError as e:
-            await self.finish(
-                run, "failed", f"Upstream HTTP {e.response.status_code}. No successful outcome was assumed."
-            )
-        except (httpx.TransportError, TimeoutError):
-            await self.finish(
-                run,
-                "needs_human",
-                "An upstream request timed out or was unreachable. The outcome is unverified.",
-            )
         except asyncio.CancelledError:
             await self.db.execute(
                 "UPDATE runs SET lease_until=now() WHERE id=%s AND lease_owner=%s", (run["id"], self.owner)
             )
             raise
         except Exception as e:
-            log.error("run=%s error_type=%s", run["id"], type(e).__name__)
-            await self.finish(
-                run, "failed", f"Investigation stopped: {type(e).__name__}. See the observable steps."
-            )
+            status, message = run_failure(e)
+            log.warning("run=%s error_type=%s status=%s", run["id"], type(e).__name__, status)
+            await self.finish(run, status, message)
         finally:
             heartbeat.cancel()
             await asyncio.gather(heartbeat, return_exceptions=True)

@@ -10,4 +10,4 @@ CI runs backend checks with PostgreSQL, frontend type/build checks, integration 
 
 ## Release regressions
 
-`backend/tests/test_release.py` covers terminal ticket synchronization, declined conclusions, terminal cancellation, early draft writes, stale/malformed delegation, and expired-workspace cleanup. `frontend/tests/release.spec.ts` covers unsaved draft recovery, decline, keyboard modal behavior, outage recovery, account context at 320–1024px, and axe WCAG A/AA checks. The checks cover their defined screens and do not establish complete accessibility conformance.
+`backend/tests/test_release.py` covers terminal ticket synchronization, declined conclusions, terminal cancellation, early draft writes, stale/malformed delegation, expired-workspace cleanup, and actionable provider errors wrapped by MCP task groups. `frontend/tests/release.spec.ts` covers unsaved draft recovery, decline, keyboard modal behavior, outage recovery, account context at 320–1024px, unavailable Live provider feedback, and axe WCAG A/AA checks. The checks cover their defined screens and do not establish complete accessibility conformance.

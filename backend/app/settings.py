@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     app_url: str = "http://127.0.0.1:8000"
     sandbox_url: str = "http://127.0.0.1:8001"
     model_provider: Literal["deterministic", "openrouter"] = "deterministic"
+    live_mode_enabled: bool = True
+    live_unavailable_reason: str = ""
     openrouter_api_key: SecretStr = SecretStr("")
     openrouter_model: str = "openrouter/free"
     tool_transport: Literal["direct", "mcp"] = "mcp"

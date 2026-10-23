@@ -12,6 +12,7 @@ Docker Compose is the portable path. Native development needs Python 3.12+, Node
 | SANDBOX_DATABASE_URL | Laboratory PostgreSQL; lab/migration process only in Compose |
 | POSTGRES_PASSWORD / APP_DB_PASSWORD / LAB_DB_PASSWORD | Separate Compose database credentials |
 | MODEL_PROVIDER | deterministic or openrouter; recorded on every run |
+| LIVE_MODE_ENABLED / LIVE_UNAVAILABLE_REASON | Deployment switch and public explanation for unavailable Live; default true/empty |
 | OPENROUTER_API_KEY / OPENROUTER_MODEL | Optional live credential and free model/router |
 | TOOL_TRANSPORT | mcp (default) or direct (same registry, useful for debugging) |
 | APP_URL / SANDBOX_URL | Fixed trusted service locations; never model arguments |

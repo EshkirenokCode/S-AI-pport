@@ -13,6 +13,8 @@ APP_PORT=18080
 SECURE_COOKIES=true
 ALLOWED_ORIGINS=https://saipport.gulevskii.dev
 MODEL_PROVIDER=deterministic
+LIVE_MODE_ENABLED=false
+LIVE_UNAVAILABLE_REASON="OpenRouter denies requests from this server network (HTTP 403). This demo uses Offline mode. Live is available in a locally configured installation."
 TOOL_TRANSPORT=mcp
 SESSION_LIMIT_PER_HOUR=30
 GLOBAL_SESSIONS_PER_HOUR=100
@@ -20,7 +22,7 @@ GLOBAL_ACTIVE_RUNS=6
 LIVE_CALLS_PER_DAY=40
 ```
 
-An optional OpenRouter key is provided separately, never in source or build arguments. Only free models are permitted. The default offline driver keeps the demonstration reproducible when the development key expires or a free provider is unavailable.
+The public host runs Offline by explicit deployment choice. OpenRouter returns HTTP 403 even for its public model catalog from this network. The hosted application explains this restriction and rejects attempts to request Live through the API. No development model key is needed on the public host. Local Live support remains enabled by default and permits free models only; its optional key stays outside source and build arguments.
 
 The API binds to host loopback on port 18080 for local diagnostics. PostgreSQL and the laboratory have no published ports. The API, worker, and laboratory use a non-root user, read-only root filesystem, bounded temporary storage, dropped capabilities, and process/memory limits. Container logs rotate.
 
@@ -68,4 +70,16 @@ The host also needs certificate renewal and log rotation for this new hostname. 
 
 ## Deployment verification
 
-Rollout checks and the deployed revision are recorded here after the first successful deployment. API `/ready` checks product PostgreSQL and the laboratory; the browser execution check also verifies the worker and its MCP path. A healthy `/ready` alone does not prove the worker is running.
+Release 0.2.0 was deployed on 23 October 2026. The host checkout tracks the reviewed `main` revision; record its exact SHA with `git rev-parse HEAD` for each subsequent rollout.
+
+- DNS resolves this hostname to the demo VDS; HTTPS uses a valid Let’s Encrypt certificate expiring 21 January 2027. HTTP redirects to HTTPS.
+- `/ready` passes, static assets load, and an external Offline billing investigation/approval verifies Pro access through the real worker/MCP/laboratory path. A healthy `/ready` alone does not prove the worker is running.
+- The matched backup pair from `20261023T101039Z` was restored into two newly created verification databases. Both contained 42 expected ticket/account rows. Verification databases were then removed; original volumes were preserved.
+- `saipport-cert-renew.timer` is active and checks twice daily. The dedicated service successfully checks this certificate and validates Nginx before any graceful reload. `/etc/logrotate.d/saipport-demo` rotates only this demo's proxy logs.
+- PostgreSQL and laboratory ports remain private. The portfolio and existing CRM return HTTP 200; their containers were not restarted by this deployment.
+
+Repeat the external workflow smoke check after upgrades:
+
+```sh
+.venv/bin/python scripts/container_smoke.py --base-url https://saipport.gulevskii.dev
+```

@@ -21,12 +21,14 @@ Reviewed on 23 October 2026: application/API routes, schemas, permissions, worke
 | Critical action followed the full technical event log | Put findings and proposal first; make activity inspectable below | Updated approval screenshots |
 | The public demo had no global provisioning/queue cap or retention | Add database-enforced global caps and bounded cleanup of expired synthetic workspaces | Retention regression; deployment configuration |
 | Small, low-contrast text and a decorative shell competed with the work | New composition, local IBM Plex typography, contrast corrections, coherent responsive states | Automated WCAG A/AA checks on workspace, approval and settings |
+| MCP task groups hid upstream access errors | Unwrap nested exceptions and return an actionable, sanitized provider outcome | Wrapped HTTP 401/403/429 and policy regression |
+| Hosted Live could be selected despite a provider network restriction | Disable Live per deployment, enforce it in the API, explain the reason, and default to Offline | Browser restriction check and public session API |
 | Runtime imported JWT through a transitive dependency | Declare PyJWT directly | Dependency check and installation lock |
 
 ## Validation
 
-- 40 backend tests pass with PostgreSQL, the separate HTTP laboratory, and real stdio MCP.
-- 12 browser scenarios pass, including automated accessibility checks. This does not replace manual assistive-technology testing.
+- 41 backend tests pass with PostgreSQL, the separate HTTP laboratory, and real stdio MCP.
+- 13 browser scenarios pass, including automated accessibility checks. This does not replace manual assistive-technology testing.
 - 36 deterministic evaluation cases produce the expected disposition with no duplicate effects.
 - TypeScript/Vite production build and Python lint pass.
 - npm reports no known vulnerabilities in the installed dependency set at the time of checking.
@@ -34,6 +36,6 @@ Reviewed on 23 October 2026: application/API routes, schemas, permissions, worke
 
 ## Remaining product boundaries
 
-Accounts and payments are synthetic. Role selection is a demo fixture. Documentation retrieval is lexical. The integration acknowledgement is simulated by the laboratory. Free model availability is external, and a model can still exhaust its budget or reach an incorrect conclusion. Backend action eligibility and verification remain deterministic boundaries. Customer replies are drafts, and no external messaging connector is implemented.
+Accounts and payments are synthetic. Role selection is a demo fixture. Documentation retrieval is lexical. The integration acknowledgement is simulated by the laboratory. The hosted demo is explicitly Offline because OpenRouter returns HTTP 403 from that server network. Local Live remains supported. Free model availability is external, and a model can still exhaust its budget or reach an incorrect conclusion. Backend action eligibility and verification remain deterministic boundaries. Customer replies are drafts, and no external messaging connector is implemented.
 
 The audit fixes identified defects within this release's scope; it is not a claim that the application has no remaining defects or is ready for arbitrary production integrations.

@@ -2354,3 +2354,14 @@ summary::-webkit-details-marker {
 .investigation-checklist {
   margin-bottom: 0;
 }
+
+.provider-unavailable {
+  margin-top: 14px;
+  padding: 12px;
+  background: #fff7e9;
+  border: 1px solid #e8d4b0;
+  border-radius: 5px;
+  color: #815f31;
+  font-size: 13px;
+  line-height: 1.7;
+}

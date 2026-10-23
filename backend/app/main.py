@@ -91,7 +91,8 @@ async def session(actor=Depends(identity)):
         **actor,
         "provider": cfg.model_provider,
         "transport": cfg.tool_transport,
-        "live_available": bool(cfg.openrouter_api_key.get_secret_value()),
+        "live_available": cfg.live_mode_enabled and bool(cfg.openrouter_api_key.get_secret_value()),
+        "live_unavailable_reason": cfg.live_unavailable_reason,
         "synthetic": True,
     }
 
@@ -135,6 +136,12 @@ async def start(ticket_id: UUID, body: StartRun, request: Request, actor=Depends
     if active:
         return active
     provider = body.provider or cfg.model_provider
+    if provider == "openrouter" and not cfg.live_mode_enabled:
+        raise HTTPException(
+            503,
+            cfg.live_unavailable_reason
+            or "Live mode is unavailable on this deployment. Offline mode remains available.",
+        )
     if provider == "openrouter" and not cfg.openrouter_api_key.get_secret_value():
         raise HTTPException(503, "OpenRouter key is not configured. Offline mode remains available.")
     async with db.pool.connection() as c, c.transaction():

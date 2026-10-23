@@ -99,6 +99,7 @@ export type Session = {
   provider: "deterministic" | "openrouter";
   transport: string;
   live_available: boolean;
+  live_unavailable_reason?: string;
 };
 
 export type Metrics = {

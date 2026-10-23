@@ -181,7 +181,9 @@ export default function App() {
           s = await api<Session>("/session");
         }
         setSession(s);
-        let choice = s.provider;
+        let choice: Session["provider"] = s.live_available
+          ? s.provider
+          : "deterministic";
         try {
           const stored = sessionStorage.getItem("saipport:provider");
           if (
@@ -1434,7 +1436,11 @@ export default function App() {
                     disabled={!session?.live_available}
                   >
                     Live · OpenRouter free model
-                    {!session?.live_available ? " (key required)" : ""}
+                    {!session?.live_available
+                      ? session?.live_unavailable_reason
+                        ? " (unavailable)"
+                        : " (key required)"
+                      : ""}
                   </option>
                 </select>
               </label>
@@ -1443,6 +1449,11 @@ export default function App() {
                 deterministic driver. Live mode asks a free model to choose and
                 call tools. Neither mode can approve its own repair.
               </p>
+              {session?.live_unavailable_reason && !session.live_available && (
+                <p className="provider-unavailable" role="status">
+                  {session.live_unavailable_reason}
+                </p>
+              )}
               <div className="setting-section">
                 <h3>Try a different role</h3>
                 <p className="muted">

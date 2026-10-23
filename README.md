@@ -32,7 +32,9 @@ Open [saipport.gulevskii.dev](https://saipport.gulevskii.dev). Each visitor rece
 4. Confirm **Outcome verified** and the account's **Pro** plan. Edit and save the reply.
 5. Try an integration incident or setup question. In **Settings**, create an analyst workspace to test approval restrictions.
 
-The default **Offline** mode is a reproducible tool driver using the same real APIs, MCP, policies, worker, and verification. **Live** mode uses a free OpenRouter model to choose tools and write the findings. Live access depends on the configured development key, provider availability, and quotas. Errors stay visible; there is no paid fallback.
+The hosted demo runs in **Offline** mode: OpenRouter rejects requests from the demonstration server network with HTTP 403, so Live is disabled there. A locally configured installation can use Live.
+
+**Offline** is a reproducible tool driver using the same real APIs, MCP, policies, worker, and verification. **Live** mode uses a free OpenRouter model to choose tools and write the findings. Live access depends on the configured development key, provider availability, and quotas. Errors stay visible; there is no paid fallback.
 
 [Approval screen](docs/media/approval.png) · [Verified repair](docs/media/repair-verified.png) · [Mobile workspace](docs/media/mobile.png)
 
@@ -93,8 +95,8 @@ Observed development results, 23 October 2026:
 
 | Check | Result | Scope |
 | --- | --- | --- |
-| Backend | 40 passing tests | Real PostgreSQL, HTTP laboratory, MCP, permissions, cancellation, recovery, and retention |
-| Browser | 12 passing scenarios | Three workflows, decline/roles, draft recovery, keyboard dialogs, outage recovery, 320–1024px layouts, automated WCAG A/AA checks |
+| Backend | 41 passing tests | Real PostgreSQL, HTTP laboratory, MCP, permissions, cancellation, recovery, and retention |
+| Browser | 13 passing scenarios | Three workflows, decline/roles, draft recovery, keyboard dialogs, outage recovery, 320–1024px layouts, automated WCAG A/AA checks |
 | Workflow evaluation | 36/36 expected outcomes; zero duplicate effects | Deterministic driver; 24 development and 12 holdout cases |
 | Retrieval | 20/24 baseline → 21/24; long queries 0/6 → 6/6 | Four applicable synthetic documents; lexical retrieval |
 | Live development checks | Three canonical families completed; billing also checked on a pinned free model | Stored model/tool traces; provider-reported cost $0 |

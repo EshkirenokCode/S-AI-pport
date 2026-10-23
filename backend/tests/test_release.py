@@ -116,3 +116,26 @@ def test_expired_synthetic_workspace_retention(client, stack):
         assert not c.execute("SELECT id FROM tenants WHERE id=%s", (tenant,)).fetchone()
     with psycopg.connect(stack.env["SANDBOX_DATABASE_URL"]) as c:
         assert not c.execute("SELECT id FROM accounts WHERE tenant_id=%s", (tenant,)).fetchone()
+
+
+def test_mcp_wrapped_provider_errors_preserve_actionable_outcome():
+    import httpx
+
+    from app.policy import PolicyError
+    from app.worker import run_failure
+
+    for code in (401, 403, 429):
+        request = httpx.Request("GET", "https://openrouter.ai/api/v1/models")
+        cause = httpx.HTTPStatusError(
+            "untrusted upstream body", request=request, response=httpx.Response(code, request=request)
+        )
+        wrapped = ExceptionGroup("MCP transport", [ExceptionGroup("Task group", [cause])])
+        status, message = run_failure(wrapped)
+        assert status == "needs_human"
+        assert str(code) in message
+        assert "Offline" in message
+        assert "untrusted upstream body" not in message
+    assert run_failure(ExceptionGroup("MCP", [PolicyError("Model call budget exhausted")])) == (
+        "needs_human",
+        "Model call budget exhausted",
+    )
