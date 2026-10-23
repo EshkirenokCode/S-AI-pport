@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Activity,
-  ArrowDownLeft,
   ArrowLeft,
   ArrowRight,
   ArrowUpRight,
@@ -21,7 +20,6 @@ import {
   LockKeyhole,
   MessageSquare,
   MoreHorizontal,
-  Play,
   Search,
   Settings2,
   ShieldCheck,
@@ -33,29 +31,55 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import { Dialog } from "./Dialog";
+import { TimelineEvent } from "./TimelineEvent";
+import { AccountContext } from "./AccountContext";
 import type {
   Account,
   Action,
   Run,
-  RunEvent,
   Session,
   Source,
+  Metrics,
   Ticket,
 } from "./types";
 
+class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+  ) {
+    super(message);
+  }
+}
+function localDraft(run: Run) {
+  try {
+    return (
+      sessionStorage.getItem("saipport:draft:" + run.id) ??
+      run.result.reply ??
+      ""
+    );
+  } catch {
+    return run.result.reply ?? "";
+  }
+}
 async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const r = await fetch("/api" + path, {
     ...options,
     headers: { "Content-Type": "application/json", ...options.headers },
   });
   if (!r.ok) {
-    const d = await r
-      .json()
-      .catch(() => ({ detail: "The service could not be reached." }));
-    throw new Error(
+    const d = await r.json().catch(() => ({
+      detail:
+        r.status === 429
+          ? "Demo request limit reached. Wait a moment and try again."
+          : "The service could not be reached.",
+    }));
+    throw new ApiError(
       typeof d.detail === "string"
         ? d.detail
         : "The request could not be completed.",
+      r.status,
     );
   }
   return r.json();
@@ -70,6 +94,11 @@ const label = (v: string) =>
     running: "Investigating",
     cancelled: "Cancelled",
     failed: "Failed",
+    succeeded: "Executed",
+    rejected: "Declined",
+    stale: "Account changed",
+    unknown: "Outcome uncertain",
+    approved: "Approved",
   })[v] || v.replaceAll("_", " ");
 const initials = (s: string) =>
   s
@@ -86,15 +115,6 @@ const familyIcon = (s: string) =>
   ) : (
     <SlidersHorizontal size={15} />
   );
-const steps: Record<string, string> = {
-  get_account_context: "Account identified",
-  get_billing_state: "Payment and access checked",
-  get_delivery_state: "Delivery attempts inspected",
-  search_documentation: "Relevant procedures found",
-  read_document: "Procedure and version checked",
-  propose_action: "A precise repair proposed",
-  finish_investigation: "Findings prepared",
-};
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null),
@@ -119,15 +139,18 @@ export default function App() {
       null,
     ),
     [source, setSource] = useState<Source | null>(null),
-    [metrics, setMetrics] = useState<Record<string, unknown> | null>(null);
+    [metrics, setMetrics] = useState<Metrics | null>(null);
   const [draft, setDraft] = useState(""),
     [saved, setSaved] = useState(false),
     [copied, setCopied] = useState(false),
     [mobileQueue, setMobileQueue] = useState(false),
-    [connected, setConnected] = useState(true);
+    [connected, setConnected] = useState(true),
+    [contextOpen, setContextOpen] = useState(false);
   const booted = useRef(false),
     draftDirty = useRef(false),
-    selectedRef = useRef(selected);
+    selectedRef = useRef(selected),
+    draftRef = useRef(draft);
+  draftRef.current = draft;
   selectedRef.current = selected;
   const loadQueue = useCallback(async () => {
     const ts = await api<Ticket[]>("/tickets");
@@ -138,6 +161,10 @@ export default function App() {
     async (role?: string) => {
       setLoading(true);
       setError("");
+      setSelected("");
+      selectedRef.current = "";
+      setRun(null);
+      setDetail(null);
       try {
         if (role)
           await api("/demo/session", {
@@ -147,12 +174,24 @@ export default function App() {
         let s: Session;
         try {
           s = await api<Session>("/session");
-        } catch {
+        } catch (e) {
+          if (!(e instanceof ApiError) || e.status !== 401) throw e;
           await api("/demo/session", { method: "POST", body: "{}" });
           s = await api<Session>("/session");
         }
         setSession(s);
-        setProvider(s.provider);
+        let choice = s.provider;
+        try {
+          const stored = sessionStorage.getItem("saipport:provider");
+          if (
+            stored === "deterministic" ||
+            (stored === "openrouter" && s.live_available)
+          )
+            choice = stored;
+        } catch {
+          /* Storage is optional. */
+        }
+        setProvider(choice);
         const ts = await loadQueue();
         setSelected(ts[0]?.id || "");
         setRun(null);
@@ -178,6 +217,9 @@ export default function App() {
     setRun(null);
     setTab("investigation");
     setSaved(false);
+    setCopied(false);
+    setContextOpen(false);
+    setError("");
     setDraft("");
     draftDirty.current = false;
     api<NonNullable<typeof detail>>("/tickets/" + selected)
@@ -188,7 +230,8 @@ export default function App() {
           const r = await api<Run>("/runs/" + d.run_id);
           if (active) {
             setRun(r);
-            setDraft(r.result.reply || "");
+            setDraft(localDraft(r));
+            draftDirty.current = localDraft(r) !== (r.result.reply || "");
           }
         }
       })
@@ -202,7 +245,10 @@ export default function App() {
     if (!runId) return;
     let active = true;
     const tid = selectedRef.current;
+    let refreshing = false;
     const refresh = async () => {
+      if (refreshing || !active) return;
+      refreshing = true;
       try {
         const r = await api<Run>("/runs/" + runId);
         if (!active) return;
@@ -222,8 +268,16 @@ export default function App() {
           clearInterval(timer);
           es.close();
         }
-      } catch {
-        if (active) setConnected(false);
+      } catch (e) {
+        if (active) {
+          setConnected(false);
+          if (e instanceof ApiError && e.status === 401)
+            setError(
+              "Your demo session expired. Open settings to create a fresh workspace.",
+            );
+        }
+      } finally {
+        refreshing = false;
       }
     };
     void refresh();
@@ -234,7 +288,9 @@ export default function App() {
     es.onmessage = () => {
       void refresh();
     };
-    es.onerror = () => setConnected(false);
+    es.onerror = () => {
+      if (active) setConnected(false);
+    };
     es.onopen = () => setConnected(true);
     return () => {
       active = false;
@@ -244,17 +300,21 @@ export default function App() {
   }, [runId, loadQueue]);
   async function start() {
     if (!detail) return;
+    const ticketId = detail.ticket.id;
     setPending(true);
     setError("");
     setDraft("");
     draftDirty.current = false;
     try {
-      const r = await api<{ id: string }>(
-        "/tickets/" + detail.ticket.id + "/runs",
-        { method: "POST", body: JSON.stringify({ provider }) },
-      );
+      const r = await api<{ id: string }>("/tickets/" + ticketId + "/runs", {
+        method: "POST",
+        body: JSON.stringify({ provider }),
+      });
       const fresh = await api<Run>("/runs/" + r.id);
-      setRun(fresh);
+      if (selectedRef.current === ticketId) {
+        setRun(fresh);
+        setSaved(false);
+      }
       await loadQueue();
     } catch (e) {
       setError((e as Error).message);
@@ -263,6 +323,9 @@ export default function App() {
     }
   }
   async function decision(action: Action, value: "approve" | "reject") {
+    if (!run) return;
+    const runId = run.id,
+      ticketId = selected;
     setPending(true);
     setError("");
     try {
@@ -270,10 +333,17 @@ export default function App() {
         method: "POST",
         body: JSON.stringify({ decision: value, digest: action.digest }),
       });
-      const fresh = await api<Run>("/runs/" + run!.id);
-      setRun(fresh);
-      setDraft("");
-      draftDirty.current = false;
+      const fresh = await api<Run>("/runs/" + runId);
+      if (selectedRef.current === ticketId) {
+        setRun(fresh);
+        setDraft(fresh.result.reply || "");
+        draftDirty.current = false;
+        try {
+          sessionStorage.removeItem("saipport:draft:" + runId);
+        } catch {
+          /* Optional storage. */
+        }
+      }
       await loadQueue();
     } catch (e) {
       setError((e as Error).message);
@@ -283,21 +353,36 @@ export default function App() {
   }
   async function cancel() {
     if (!run) return;
+    const ticketId = selected,
+      runId = run.id;
     try {
-      await api("/runs/" + run.id + "/cancel", { method: "POST" });
-      setRun(await api<Run>("/runs/" + run.id));
+      await api("/runs/" + runId + "/cancel", { method: "POST" });
+      const fresh = await api<Run>("/runs/" + runId);
+      if (selectedRef.current === ticketId) setRun(fresh);
+      await loadQueue();
     } catch (e) {
       setError((e as Error).message);
     }
   }
   async function save() {
     if (!run) return;
+    const ticketId = selected,
+      runId = run.id,
+      text = draft;
     try {
       await api("/runs/" + run.id + "/draft", {
         method: "PATCH",
         body: JSON.stringify({ reply: draft }),
       });
-      setSaved(true);
+      if (selectedRef.current === ticketId && draftRef.current === text) {
+        setSaved(true);
+        draftDirty.current = false;
+        try {
+          sessionStorage.removeItem("saipport:draft:" + runId);
+        } catch {
+          /* Optional storage. */
+        }
+      }
     } catch (e) {
       setError((e as Error).message);
     }
@@ -310,9 +395,11 @@ export default function App() {
     }
   }
   async function activity() {
+    setMetrics(null);
+    setError("");
     setModal("activity");
     try {
-      setMetrics(await api("/metrics"));
+      setMetrics(await api<Metrics>("/metrics"));
     } catch (e) {
       setError((e as Error).message);
     }
@@ -323,9 +410,9 @@ export default function App() {
         .toLowerCase()
         .includes(query.toLowerCase()) &&
       (filter === "all" ||
+        (filter === "resolved" && t.status === "resolved") ||
         (filter === "approval" && t.run_status === "waiting_for_approval") ||
-        (filter === "open" &&
-          !["completed", "cancelled"].includes(t.run_status || ""))),
+        (filter === "open" && t.status !== "resolved")),
   );
   const waiting = tickets.filter(
     (t) => t.run_status === "waiting_for_approval",
@@ -343,7 +430,7 @@ export default function App() {
     [];
   const activeAction = run?.actions[0];
   const t = detail?.ticket;
-  if (loading && !session)
+  if (!session)
     return (
       <div className="boot">
         <div className="brand-icon">
@@ -351,39 +438,107 @@ export default function App() {
         </div>
         <h1>Opening your workspace</h1>
         <p>Preparing an isolated demo with synthetic accounts.</p>
-        <LoaderCircle className="spin" />
+        {error ? (
+          <>
+            <p role="alert" className="boot-error">
+              {error}
+            </p>
+            <button className="primary-button" onClick={() => void bootstrap()}>
+              Retry connection
+            </button>
+          </>
+        ) : (
+          <LoaderCircle className="spin" />
+        )}
       </div>
     );
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#ticket-workspace">
+        Skip to ticket
+      </a>
       <nav className="rail" aria-label="Main navigation">
-        <a className="brand-icon" href="/" aria-label="S(AI)pport home">
-          s<span>✳</span>
+        <a className="brand" href="/" aria-label="S(AI)pport home">
+          <span className="brand-mark">
+            s<span>/</span>
+          </span>
+          <span>
+            sAIpport<span className="brand-caption">SUPPORT OPERATIONS</span>
+          </span>
         </a>
+        <button
+          className="workspace-switch"
+          onClick={() => setModal("settings")}
+        >
+          <span className="workspace-letter">A</span>
+          <span>
+            Acme Support<small>Demo workspace</small>
+          </span>
+          <ChevronDown size={14} />
+        </button>
+        <div className="nav-caption">WORKSPACE</div>
         <div className="rail-group">
           <button
-            className="rail-button selected"
+            className={
+              "rail-button " +
+              (["all", "open"].includes(filter) ? "selected" : "")
+            }
             aria-label="Ticket queue"
             onClick={() => {
-              setMobileQueue((v) => !v);
+              setFilter("all");
+              setMobileQueue(true);
               setModal(null);
             }}
           >
-            <Inbox size={22} />
+            <Inbox size={18} />
+            <span>Inbox</span>
+            <b>{tickets.filter((t) => t.status !== "resolved").length}</b>
+          </button>
+          <button
+            aria-label="Approvals"
+            className={
+              "rail-button " + (filter === "approval" ? "selected" : "")
+            }
+            onClick={() => {
+              setFilter("approval");
+              setMobileQueue(true);
+            }}
+          >
+            <ShieldCheck size={18} />
+            <span>Approvals</span>
+            {waiting > 0 && <b className="approval-count">{waiting}</b>}
+          </button>
+          <button
+            aria-label="Resolved tickets"
+            className={
+              "rail-button " + (filter === "resolved" ? "selected" : "")
+            }
+            onClick={() => {
+              setFilter("resolved");
+              setMobileQueue(true);
+            }}
+          >
+            <CheckCheck size={18} />
+            <span>Resolved</span>
           </button>
           <button
             className="rail-button"
             aria-label="Workspace activity"
             onClick={() => void activity()}
           >
-            <Activity size={22} />
+            <Activity size={18} />
+            <span>Activity</span>
           </button>
-          <button
-            className="rail-button"
-            aria-label="Workspace settings"
-            onClick={() => setModal("settings")}
-          >
-            <Settings2 size={22} />
+        </div>
+        <div className="sidebar-note">
+          <span className="small-dot succeeded" /> Sandbox environment
+          <p>
+            Explore real workflows
+            <br />
+            with sample customer data.
+          </p>
+          <button onClick={() => setModal("help")}>
+            How the demo works <ArrowUpRight size={13} />
           </button>
         </div>
         <div className="rail-bottom">
@@ -392,30 +547,55 @@ export default function App() {
             aria-label="Demo guide"
             onClick={() => setModal("help")}
           >
-            <CircleHelp size={21} />
+            <CircleHelp size={18} />
+            <span>Quick guide</span>
           </button>
-          <div className="operator-avatar" title={session?.name}>
-            IG
-          </div>
+          <button
+            className="rail-button"
+            aria-label="Workspace settings"
+            onClick={() => setModal("settings")}
+          >
+            <Settings2 size={18} />
+            <span>Settings</span>
+          </button>
+          <a
+            className="author-link"
+            href="https://gulevskii.dev/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <span className="operator-avatar">IG</span>
+            <span>
+              Ilia Gulevskii
+              <small>
+                Project portfolio <ArrowUpRight size={11} />
+              </small>
+            </span>
+          </a>
         </div>
       </nav>
       <div className="workspace">
         <header className="topbar">
-          <div className="wordmark">
-            s(ai)pport
-            <span className="wordmark-divider" />
-            <span className="workspace-name">
-              Acme workspace <ChevronDown size={13} />
+          <div className="topbar-title">
+            <Inbox size={17} />
+            <span>Support inbox</span>
+            <ChevronRight size={13} />
+            <span className="muted">
+              {filter === "approval"
+                ? "Awaiting approval"
+                : filter === "resolved"
+                  ? "Resolved"
+                  : "All conversations"}
             </span>
           </div>
           <div className="topbar-right">
             <span className="demo-badge">
-              <span />
-              Synthetic demo
+              <span /> Synthetic demo
             </span>
             <button
               className="operator-switch"
               onClick={() => setModal("settings")}
+              aria-label="Change workspace role"
             >
               <span className="tiny-avatar">
                 {session?.role === "analyst" ? "DA" : "DO"}
@@ -427,28 +607,14 @@ export default function App() {
             </button>
           </div>
         </header>
-        <div className="page-heading">
-          <div>
-            <div className="eyebrow">
-              YOUR SUPPORT DESK, WITH A SECOND PAIR OF EYES
-            </div>
-            <h1>
-              Make the next move<span className="orange-dot">.</span>
-            </h1>
-            <p>From a customer question to a checked, approved resolution.</p>
-          </div>
-          <button
-            className="outline-button guide-button"
-            onClick={() => setModal("help")}
-          >
-            <Play size={14} /> Explore the demo <ArrowUpRight size={15} />
-          </button>
-        </div>
         <main className="desk">
-          <aside className={"queue " + (mobileQueue ? "mobile-open" : "")}>
+          <aside
+            aria-label="Ticket inbox"
+            className={"queue " + (mobileQueue ? "mobile-open" : "")}
+          >
             <div className="queue-heading">
               <h2>
-                Inbox <span>{tickets.length}</span>
+                Conversations <span>{visible.length}</span>
               </h2>
               <button
                 className="icon-button"
@@ -468,7 +634,6 @@ export default function App() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
-              <kbd>⌕</kbd>
             </label>
             <div className="queue-filters">
               {[
@@ -492,6 +657,7 @@ export default function App() {
               {visible.map((ticket) => (
                 <button
                   key={ticket.id}
+                  aria-current={selected === ticket.id ? "true" : undefined}
                   className={
                     "ticket-row " + (selected === ticket.id ? "active" : "")
                   }
@@ -550,7 +716,12 @@ export default function App() {
               <LockKeyhole size={13} /> Your own isolated workspace
             </div>
           </aside>
-          <section className="case-panel">
+          <section
+            tabIndex={-1}
+            id="ticket-workspace"
+            aria-label="Selected ticket"
+            className="case-panel"
+          >
             {error && (
               <div className="error-banner" role="alert">
                 <TriangleAlert size={17} />
@@ -605,10 +776,13 @@ export default function App() {
                       setTab(tab === "details" ? "investigation" : "details")
                     }
                   >
-                    <MoreHorizontal size={20} />
+                    <MoreHorizontal size={18} />
                   </button>
                 </div>
                 <div className="customer-message">
+                  <div className="ticket-title">
+                    <h2>{t!.subject}</h2>
+                  </div>
                   <div className="message-meta">
                     <div className={"customer-avatar tone-" + (t!.number % 4)}>
                       {initials(t!.customer)}
@@ -622,17 +796,25 @@ export default function App() {
                       Customer message
                     </span>
                   </div>
-                  <h2>{t!.subject}</h2>
-                  <p>{t!.body}</p>
+                  <p className="message-bubble">{t!.body}</p>
                   <div className="message-tags">
                     <span>
                       {familyIcon(t!.family)}
                       {t!.family}
                     </span>
                     <span>
-                      <Layers size={13} />
-                      Product {detail.account.product_version}
+                      <Layers size={13} /> Product{" "}
+                      {detail.account.product_version}
                     </span>
+                    <button
+                      className="mobile-context-button"
+                      onClick={() => setContextOpen((v) => !v)}
+                      aria-expanded={contextOpen}
+                      aria-controls="account-context"
+                    >
+                      <CreditCard size={13} /> Account details{" "}
+                      <ChevronDown size={13} />
+                    </button>
                   </div>
                 </div>
                 <div className="case-tabs">
@@ -662,8 +844,8 @@ export default function App() {
                 <div className="case-body">
                   {tab === "evidence" ? (
                     <div className="sources-view">
-                      <div className="section-kicker">TRACEABLE BY DESIGN</div>
-                      <h3>Every conclusion needs a source.</h3>
+                      <div className="section-kicker">KNOWLEDGE BASE</div>
+                      <h3>Documentation sources</h3>
                       <p className="muted">
                         Versioned procedures used in this investigation. Account
                         facts are available in the timeline.
@@ -750,41 +932,20 @@ export default function App() {
                     <>
                       {!run ? (
                         <div className="investigation-intro">
-                          <div className="intro-illustration">
-                            <div className="orbit-line" />
-                            <div className="intro-icon">
-                              <Sparkles size={28} strokeWidth={1.6} />
-                            </div>
-                            <span className="floating-check">
-                              <Check size={15} />
+                          <div className="intro-label">
+                            <span className="intro-icon">
+                              <Search size={20} />
                             </span>
-                            <span className="floating-source">
-                              <FileText size={16} />
-                            </span>
+                            <span>INVESTIGATION</span>
+                            <span className="intro-status">Ready</span>
                           </div>
-                          <div className="section-kicker">
-                            LESS TAB-HOPPING. MORE CLARITY.
-                          </div>
-                          <h3>Let's find out what happened.</h3>
+                          <h3>Investigate this ticket.</h3>
                           <p>
-                            Check the account, connect the evidence, and find
-                            the safest next step. You stay in control of every
-                            repair.
+                            Check the account and event history against the
+                            applicable procedure. Review the findings before
+                            making a change.
                           </p>
-                          <div className="investigation-checklist">
-                            <span>
-                              <CreditCard size={16} />
-                              Inspect account & events
-                            </span>
-                            <span>
-                              <BookOpen size={16} />
-                              Find the right procedure
-                            </span>
-                            <span>
-                              <ShieldCheck size={16} />
-                              Propose a checked action
-                            </span>
-                          </div>
+
                           <button
                             className="primary-button"
                             onClick={() => void start()}
@@ -807,13 +968,48 @@ export default function App() {
                               Change
                             </button>
                           </div>
+                          <ol className="investigation-checklist">
+                            <li>
+                              <span>01</span>
+                              <div>
+                                <strong>Inspect the account</strong>
+                                <p>Read current state and recent events.</p>
+                              </div>
+                              <CreditCard size={17} />
+                            </li>
+                            <li>
+                              <span>02</span>
+                              <div>
+                                <strong>Find supporting evidence</strong>
+                                <p>Match the product version and procedure.</p>
+                              </div>
+                              <BookOpen size={17} />
+                            </li>
+                            <li>
+                              <span>03</span>
+                              <div>
+                                <strong>Review the next step</strong>
+                                <p>Approve a specific repair or escalate.</p>
+                              </div>
+                              <ShieldCheck size={17} />
+                            </li>
+                          </ol>
                         </div>
                       ) : (
                         <>
-                          <div className="run-heading">
+                          <div
+                            className="run-heading"
+                            role="status"
+                            aria-live="polite"
+                          >
                             <div>
                               <span className={"state-dot " + run.status} />
-                              <strong>{label(run.status)}</strong>
+                              <strong>
+                                {run.status === "running" &&
+                                run.phase === "execute"
+                                  ? "Applying repair"
+                                  : label(run.status)}
+                              </strong>
                               {busy(run) && (
                                 <LoaderCircle size={14} className="spin" />
                               )}
@@ -844,19 +1040,6 @@ export default function App() {
                               available.
                             </div>
                           )}
-                          <div className="timeline">
-                            {run.events
-                              .filter((e) => !["check"].includes(e.kind))
-                              .map((e) => (
-                                <TimelineEvent key={e.id} event={e} />
-                              ))}
-                            {busy(run) && (
-                              <div className="timeline-pending">
-                                <span className="pulse-dot" />
-                                Checking the next piece of evidence…
-                              </div>
-                            )}
-                          </div>
                           {run.error && (
                             <div className="result-card warning">
                               <TriangleAlert size={20} />
@@ -890,14 +1073,21 @@ export default function App() {
                                   {run.result.facts.map((fact, i) => (
                                     <li key={i}>
                                       <Check size={14} />
-                                      {fact}
+                                      {fact.replace(
+                                        /\s*\(api:[0-9a-f-]+\)/gi,
+                                        "",
+                                      )}
                                     </li>
                                   ))}
                                 </ul>
                               ) : null}
                               {run.result.assumptions?.length ? (
                                 <div className="missing-info">
-                                  <strong>Not yet established</strong>
+                                  <strong>
+                                    {run.result.verification?.verified
+                                      ? "Assumptions recorded before the repair"
+                                      : "Not yet established"}
+                                  </strong>
                                   {run.result.assumptions.map((item, i) => (
                                     <p key={i}>{item}</p>
                                   ))}
@@ -905,7 +1095,11 @@ export default function App() {
                               ) : null}
                               {run.result.missing_information?.length ? (
                                 <div className="missing-info">
-                                  <strong>Still needed</strong>
+                                  <strong>
+                                    {run.result.verification?.verified
+                                      ? "Information requested during investigation"
+                                      : "Still needed"}
+                                  </strong>
                                   {run.result.missing_information.map(
                                     (m, i) => (
                                       <p key={i}>{m}</p>
@@ -1038,13 +1232,27 @@ export default function App() {
                                   <MessageSquare size={17} />
                                   Customer reply
                                 </h3>
-                                <span>Draft · not sent</span>
+                                <span>
+                                  {saved
+                                    ? "Saved"
+                                    : draftDirty.current
+                                      ? "Unsaved changes"
+                                      : "Draft · not sent"}
+                                </span>
                               </div>
                               <textarea
                                 aria-label="Customer reply draft"
                                 value={draft}
                                 onChange={(e) => {
                                   setDraft(e.target.value);
+                                  try {
+                                    sessionStorage.setItem(
+                                      "saipport:draft:" + run.id,
+                                      e.target.value,
+                                    );
+                                  } catch {
+                                    /* Optional storage. */
+                                  }
                                   draftDirty.current = true;
                                   setSaved(false);
                                 }}
@@ -1065,7 +1273,12 @@ export default function App() {
                                           () => setCopied(false),
                                           2000,
                                         );
-                                      });
+                                      })
+                                      .catch(() =>
+                                        setError(
+                                          "Clipboard access failed. Select the reply text and copy it manually.",
+                                        ),
+                                      );
                                   }}
                                 >
                                   {copied ? (
@@ -1085,6 +1298,30 @@ export default function App() {
                               </div>
                             </div>
                           )}
+                          <details
+                            className="activity-timeline"
+                            open={!run.result.summary || busy(run)}
+                          >
+                            <summary>
+                              <Activity size={15} />
+                              <strong>Investigation activity</strong>
+                              <span>{tools.length} tool calls</span>
+                              <ChevronDown size={14} />
+                            </summary>
+                            <div className="timeline">
+                              {run.events
+                                .filter((e) => !["check"].includes(e.kind))
+                                .map((e) => (
+                                  <TimelineEvent key={e.id} event={e} />
+                                ))}
+                              {busy(run) && (
+                                <div className="timeline-pending">
+                                  <span className="pulse-dot" />
+                                  Checking the next piece of evidence…
+                                </div>
+                              )}
+                            </div>
+                          </details>
                           {[
                             "completed",
                             "needs_human",
@@ -1116,387 +1353,262 @@ export default function App() {
               </>
             )}
           </section>
-          <aside className="context-panel">
-            <div className="context-heading">
-              <h2>Account context</h2>
-              <ArrowDownLeft size={17} />
-            </div>
-            {detail ? (
-              <>
-                <div className="company-mark">
-                  {detail.account.company
-                    .split(" ")
-                    .map((w) => w[0])
-                    .join("")
-                    .slice(0, 2)}
-                </div>
-                <h3 className="company-name">{detail.account.company}</h3>
-                <p className="company-sub">{t?.customer}'s workspace</p>
-                <dl className="context-facts">
-                  <div>
-                    <dt>Current plan</dt>
-                    <dd
-                      className={
-                        "plan-pill " +
-                        (detail.account.plan === "Pro" ? "pro" : "")
-                      }
-                    >
-                      {detail.account.plan}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Product version</dt>
-                    <dd>{detail.account.product_version}</dd>
-                  </div>
-                  <div>
-                    <dt>Payment</dt>
-                    <dd>
-                      <span
-                        className={
-                          "small-dot " + detail.account.billing.payment_status
-                        }
-                      />
-                      {detail.account.billing.payment_status}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Integration</dt>
-                    <dd>
-                      <span className="small-dot succeeded" />
-                      {detail.account.delivery.integration_status}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Account ID</dt>
-                    <dd className="mono">{short(detail.account.id)}…</dd>
-                  </div>
-                </dl>
-                <div className="context-divider" />
-                <div className="section-kicker">WORKING BOUNDARIES</div>
-                <div className="boundary">
-                  <ShieldCheck size={17} />
-                  <div>
-                    <strong>Approval before action</strong>
-                    <p>
-                      Every repair is scoped to one event and checked before it
-                      runs.
-                    </p>
-                  </div>
-                </div>
-                <div className="boundary">
-                  <Layers size={17} />
-                  <div>
-                    <strong>Real calls. Test data.</strong>
-                    <p>
-                      This SaaS laboratory stores real state using synthetic
-                      accounts.
-                    </p>
-                  </div>
-                </div>
-                <div className="context-note">
-                  <span className="context-note-icon">↗</span>
-                  <p>
-                    A repair is complete only when a fresh check confirms it.
-                  </p>
-                </div>
-                <button
-                  className="context-trace"
-                  onClick={() => setTab("details")}
-                >
-                  <FileText size={15} />
-                  <span>Inspect execution record</span>
-                  <ArrowUpRight size={15} />
-                </button>
-              </>
-            ) : (
-              <div className="skeleton-block" />
-            )}
-            <div className="context-footer">
-              BUILT FOR THE PEOPLE
-              <br />
-              BEHIND THE HELP DESK.
-            </div>
-          </aside>
+          <AccountContext
+            account={detail?.account}
+            customer={t?.customer}
+            open={contextOpen}
+            onClose={() => setContextOpen(false)}
+            onInspect={() => {
+              setTab("details");
+              setContextOpen(false);
+            }}
+          />
         </main>
-        <footer className="workspace-footer">
-          <span>
-            S(AI)pport <span> / </span> A little more certainty.
-          </span>
-          <span>
-            Isolated data <i /> Explicit approvals <i /> Verified outcomes
-          </span>
-        </footer>
       </div>
       {(modal || source) && (
-        <div
-          className="modal-backdrop"
-          onClick={() => {
+        <Dialog
+          title={
+            source
+              ? "Documentation source"
+              : modal === "settings"
+                ? "Workspace settings"
+                : modal === "activity"
+                  ? "Workspace activity"
+                  : "Demo guide"
+          }
+          onClose={() => {
             setModal(null);
             setSource(null);
           }}
         >
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-label={
-              source
-                ? "Documentation source"
-                : modal === "settings"
-                  ? "Workspace settings"
-                  : modal === "activity"
-                    ? "Workspace activity"
-                    : "Demo guide"
-            }
-            className="modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              className="modal-close icon-button"
-              aria-label="Close dialog"
-              onClick={() => {
-                setModal(null);
-                setSource(null);
-              }}
-            >
-              <X size={20} />
-            </button>
-            {source ? (
-              <>
-                <div className="section-kicker">VERSIONED SOURCE</div>
-                <h2>{source.title}</h2>
-                <div className="source-meta">
-                  Version {source.version} · Product {source.product_version} ·{" "}
-                  {source.source_key}
-                </div>
-                <p className="source-body">{source.body}</p>
-                <div className="hint mono">{source.id}</div>
-              </>
-            ) : modal === "settings" ? (
-              <>
-                <div className="section-kicker">WORKSPACE SETTINGS</div>
-                <h2>Choose how to investigate.</h2>
-                <p className="muted">
-                  The provider is recorded on each run. Changing it affects new
-                  investigations.
-                </p>
-                <label className="setting-label">
-                  Investigation provider
-                  <select
-                    aria-label="Investigation provider"
-                    value={provider}
-                    onChange={(e) =>
-                      setProvider(e.target.value as typeof provider)
+          {error && modal !== "activity" && (
+            <p role="alert" className="modal-error">
+              {error}
+            </p>
+          )}
+          {source ? (
+            <>
+              <div className="section-kicker">VERSIONED SOURCE</div>
+              <h2>{source.title}</h2>
+              <div className="source-meta">
+                Version {source.version} · Product {source.product_version} ·{" "}
+                {source.source_key}
+              </div>
+              <p className="source-body">{source.body}</p>
+              <div className="hint mono">{source.id}</div>
+            </>
+          ) : modal === "settings" ? (
+            <>
+              <div className="section-kicker">WORKSPACE SETTINGS</div>
+              <h2>Workspace settings</h2>
+              <p className="muted">
+                The provider is recorded on each run. Changing it affects new
+                investigations.
+              </p>
+              <label className="setting-label">
+                Investigation provider
+                <select
+                  aria-label="Investigation provider"
+                  value={provider}
+                  onChange={(e) => {
+                    const choice = e.target.value as typeof provider;
+                    setProvider(choice);
+                    try {
+                      sessionStorage.setItem("saipport:provider", choice);
+                    } catch {
+                      /* Optional storage. */
                     }
+                  }}
+                >
+                  <option value="deterministic">
+                    Offline · deterministic tool driver
+                  </option>
+                  <option
+                    value="openrouter"
+                    disabled={!session?.live_available}
                   >
-                    <option value="deterministic">
-                      Offline · deterministic tool driver
-                    </option>
-                    <option
-                      value="openrouter"
-                      disabled={!session?.live_available}
-                    >
-                      Live · OpenRouter free model
-                      {!session?.live_available ? " (key required)" : ""}
-                    </option>
-                  </select>
-                </label>
-                <p className="hint">
-                  Offline mode exercises the real APIs and workflow with a
-                  deterministic driver. Live mode asks a free model to choose
-                  and call tools. Neither mode can approve its own repair.
-                </p>
-                <div className="setting-section">
-                  <h3>Try a different role</h3>
-                  <p className="muted">
-                    Create a fresh, isolated workspace. Your current workspace
-                    remains stored until expiry.
-                  </p>
-                  <div className="role-buttons">
-                    <button
-                      className="outline-button"
-                      disabled={loading}
-                      onClick={() => void bootstrap("operator")}
-                    >
-                      <ShieldCheck size={15} />
-                      New operator workspace
-                    </button>
-                    <button
-                      className="outline-button"
-                      disabled={loading}
-                      onClick={() => void bootstrap("analyst")}
-                    >
-                      <Search size={15} />
-                      New analyst workspace
-                    </button>
-                  </div>
-                </div>
-                <button
-                  className="primary-button"
-                  onClick={() => setModal(null)}
-                >
-                  Done
-                  <Check size={15} />
-                </button>
-              </>
-            ) : modal === "activity" ? (
-              <>
-                <div className="section-kicker">OBSERVABLE OPERATIONS</div>
-                <h2>Workspace activity</h2>
-                {metrics ? (
-                  <>
-                    <div className="metric-grid">
-                      {(
-                        (metrics.runs || []) as {
-                          status: string;
-                          count: number;
-                        }[]
-                      ).map((r) => (
-                        <div key={r.status}>
-                          <strong>{r.count}</strong>
-                          <span>{label(r.status)}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <pre className="usage-summary">
-                      {JSON.stringify(metrics.usage, null, 2)}
-                    </pre>
-                    <div className="audit-list">
-                      {(
-                        (metrics.audit || []) as {
-                          verb: string;
-                          object_id: string;
-                          created_at: string;
-                        }[]
-                      ).map((a, i) => (
-                        <div key={i}>
-                          <Check size={14} />
-                          <span>{a.verb}</span>
-                          <code>{short(a.object_id)}</code>
-                          <time>
-                            {new Date(a.created_at).toLocaleTimeString()}
-                          </time>
-                        </div>
-                      ))}
-                    </div>
-                    {!(metrics.audit as unknown[])?.length && (
-                      <p className="muted">
-                        Start an investigation to see decisions and execution
-                        records here.
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <LoaderCircle className="spin" />
-                )}
-              </>
-            ) : (
-              <>
-                <div className="section-kicker">A FIVE-MINUTE WALKTHROUGH</div>
-                <h2>From incident to certainty.</h2>
+                    Live · OpenRouter free model
+                    {!session?.live_available ? " (key required)" : ""}
+                  </option>
+                </select>
+              </label>
+              <p className="hint">
+                Offline mode exercises the real APIs and workflow with a
+                deterministic driver. Live mode asks a free model to choose and
+                call tools. Neither mode can approve its own repair.
+              </p>
+              <div className="setting-section">
+                <h3>Try a different role</h3>
                 <p className="muted">
-                  Every account here is synthetic. The tools, approvals, stored
-                  state, and verification are real.
+                  Start over with fresh sample data and the selected role. Your
+                  current workspace expires after 24 hours.
                 </p>
-                <ol className="guide-steps">
-                  <li>
-                    <span>01</span>
+                <div className="role-buttons">
+                  <button
+                    className="outline-button"
+                    disabled={loading}
+                    onClick={() => void bootstrap("operator")}
+                  >
+                    <ShieldCheck size={15} />
+                    New operator workspace
+                  </button>
+                  <button
+                    className="outline-button"
+                    disabled={loading}
+                    onClick={() => void bootstrap("analyst")}
+                  >
+                    <Search size={15} />
+                    New analyst workspace
+                  </button>
+                </div>
+              </div>
+              <button className="primary-button" onClick={() => setModal(null)}>
+                Done
+                <Check size={15} />
+              </button>
+            </>
+          ) : modal === "activity" ? (
+            <>
+              <div className="section-kicker">OBSERVABLE OPERATIONS</div>
+              <h2>Workspace activity</h2>
+              {metrics ? (
+                <>
+                  <div className="metric-grid">
+                    {(
+                      (metrics.runs || []) as {
+                        status: string;
+                        count: number;
+                      }[]
+                    ).map((r) => (
+                      <div key={r.status}>
+                        <strong>{r.count}</strong>
+                        <span>{label(r.status)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <dl className="usage-stats">
                     <div>
-                      <strong>Investigate a ticket</strong>
-                      <p>
-                        Start with “Paid for Pro, still on Free.” Inspect the
-                        API facts and the applicable procedure.
-                      </p>
+                      <dt>Model calls</dt>
+                      <dd>{metrics.usage.calls}</dd>
                     </div>
-                  </li>
-                  <li>
-                    <span>02</span>
                     <div>
-                      <strong>Review the exact repair</strong>
-                      <p>
-                        Check the event, expected effect, and version. Approve
-                        it as an operator, or decline.
-                      </p>
+                      <dt>Tokens used</dt>
+                      <dd>{Number(metrics.usage.tokens).toLocaleString()}</dd>
                     </div>
-                  </li>
-                  <li>
-                    <span>03</span>
                     <div>
-                      <strong>Check what changed</strong>
-                      <p>
-                        The worker runs the approved operation and reads the
-                        account again. Then review the customer reply.
-                      </p>
+                      <dt>Reported cost</dt>
+                      <dd>
+                        {metrics.usage.reported_cost === null
+                          ? "—"
+                          : "$" +
+                            Number(metrics.usage.reported_cost).toFixed(4)}
+                      </dd>
                     </div>
-                  </li>
-                </ol>
-                <p className="hint">
-                  Also try the failed integration and product setup questions.
-                  Switch to an analyst workspace to check approval restrictions.
-                  Live model access depends on the configured OpenRouter key and
-                  free-provider availability.
-                </p>
-                <button
-                  className="primary-button"
-                  onClick={() => setModal(null)}
-                >
-                  Open the workspace
-                  <ArrowRight size={16} />
-                </button>
-              </>
-            )}
-          </section>
-        </div>
+                    <div>
+                      <dt>Average model latency</dt>
+                      <dd>
+                        {metrics.usage.average_latency_ms === null
+                          ? "—"
+                          : Number(
+                              metrics.usage.average_latency_ms,
+                            ).toLocaleString() + " ms"}
+                      </dd>
+                    </div>
+                  </dl>
+                  <h3>Decision history</h3>
+                  <div className="audit-list">
+                    {(
+                      (metrics.audit || []) as {
+                        verb: string;
+                        object_id: string;
+                        created_at: string;
+                      }[]
+                    ).map((a, i) => (
+                      <div key={i}>
+                        <Check size={14} />
+                        <span>{a.verb}</span>
+                        <code>{short(a.object_id)}</code>
+                        <time>
+                          {new Date(a.created_at).toLocaleTimeString()}
+                        </time>
+                      </div>
+                    ))}
+                  </div>
+                  {!(metrics.audit as unknown[])?.length && (
+                    <p className="muted">
+                      Start an investigation to see decisions and execution
+                      records here.
+                    </p>
+                  )}
+                </>
+              ) : error ? (
+                <div className="result-card warning">
+                  <p>{error}</p>
+                  <button
+                    className="outline-button"
+                    onClick={() => void activity()}
+                  >
+                    Retry activity
+                  </button>
+                </div>
+              ) : (
+                <LoaderCircle className="spin" />
+              )}
+            </>
+          ) : (
+            <>
+              <div className="section-kicker">DEMO GUIDE</div>
+              <h2>Try your first investigation</h2>
+              <p className="muted">
+                Every account here is synthetic. The tools, approvals, stored
+                state, and verification are real.
+              </p>
+              <ol className="guide-steps">
+                <li>
+                  <span>01</span>
+                  <div>
+                    <strong>Investigate a ticket</strong>
+                    <p>
+                      Start with “Paid for Pro, still on Free.” Inspect the API
+                      facts and the applicable procedure.
+                    </p>
+                  </div>
+                </li>
+                <li>
+                  <span>02</span>
+                  <div>
+                    <strong>Review the exact repair</strong>
+                    <p>
+                      Check the event, expected effect, and version. Approve it
+                      as an operator, or decline.
+                    </p>
+                  </div>
+                </li>
+                <li>
+                  <span>03</span>
+                  <div>
+                    <strong>Check what changed</strong>
+                    <p>
+                      The worker runs the approved operation and reads the
+                      account again. Then review the customer reply.
+                    </p>
+                  </div>
+                </li>
+              </ol>
+              <p className="hint">
+                Also try the failed integration and product setup questions.
+                Switch to an analyst workspace to check approval restrictions.
+                Live model access depends on the configured OpenRouter key and
+                free-provider availability.
+              </p>
+              <button className="primary-button" onClick={() => setModal(null)}>
+                Open the workspace
+                <ArrowRight size={16} />
+              </button>
+            </>
+          )}
+        </Dialog>
       )}
     </div>
-  );
-}
-
-function TimelineEvent({ event: e }: { event: RunEvent }) {
-  const isError = e.kind === "tool_error" || e.kind === "verification_failed";
-  const title = e.data.tool ? steps[e.data.tool] || e.title : e.title;
-  const result = e.data.result;
-  let subtitle = "";
-  if (result) {
-    if (result.plan) subtitle = "Account plan: " + String(result.plan);
-    if (result.documents)
-      subtitle =
-        result.documents.length +
-        " applicable source" +
-        (result.documents.length === 1 ? "" : "s");
-    if (result.document)
-      subtitle = result.document.title + " · v" + result.document.version;
-    if (result.error) subtitle = result.error;
-  }
-  return (
-    <details className={"timeline-event " + (isError ? "has-error" : "")}>
-      <summary>
-        <span className="event-icon">
-          {isError ? (
-            <TriangleAlert size={13} />
-          ) : e.kind === "transport" ? (
-            <Unplug size={13} />
-          ) : e.kind === "approval" ? (
-            <ShieldCheck size={13} />
-          ) : e.kind === "execution" ? (
-            <Zap size={13} />
-          ) : (
-            <Check size={13} />
-          )}
-        </span>
-        <div>
-          <strong>{title}</strong>
-          {subtitle && <p>{subtitle}</p>}
-        </div>
-        <time>
-          {new Date(e.created_at).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          })}
-        </time>
-        <ChevronRight size={13} className="event-chevron" />
-      </summary>
-      <pre>{JSON.stringify(e.data, null, 2)}</pre>
-    </details>
   );
 }

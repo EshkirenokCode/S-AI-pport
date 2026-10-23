@@ -7,3 +7,7 @@ Critical checks cover all three families, exact action targets, approval integri
 Evaluation cases are versioned and split into development and holdout sets. Reports separate correct disposition, correct action, final business effect, source grounding, forbidden effects, latency, calls, tokens, and cost. Live results identify the exact returned model and sample count. Offline results must never be presented as measured LLM accuracy.
 
 CI runs backend checks with PostgreSQL, frontend type/build checks, integration tests, and browser end-to-end checks. Live evaluation is explicit and never part of ordinary PR CI.
+
+## Release regressions
+
+`backend/tests/test_release.py` covers terminal ticket synchronization, declined conclusions, terminal cancellation, early draft writes, stale/malformed delegation, and expired-workspace cleanup. `frontend/tests/release.spec.ts` covers unsaved draft recovery, decline, keyboard modal behavior, outage recovery, account context at 320–1024px, and axe WCAG A/AA checks. The checks cover their defined screens and do not establish complete accessibility conformance.

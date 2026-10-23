@@ -12,6 +12,13 @@ x-product-env: &product-env
   SECURE_COOKIES: ${SECURE_COOKIES:-false}
   ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8000,http://127.0.0.1:8000}
   LIVE_CALLS_PER_DAY: ${LIVE_CALLS_PER_DAY:-40}
+  SESSION_LIMIT_PER_HOUR: ${SESSION_LIMIT_PER_HOUR:-20}
+  GLOBAL_SESSIONS_PER_HOUR: ${GLOBAL_SESSIONS_PER_HOUR:-100}
+  GLOBAL_ACTIVE_RUNS: ${GLOBAL_ACTIVE_RUNS:-20}
+  RUNS_PER_TENANT: ${RUNS_PER_TENANT:-40}
+x-logging: &logging
+  driver: json-file
+  options: {max-size: 10m, max-file: '3'}
 services:
   postgres:
     image: postgres:17-alpine
@@ -29,6 +36,7 @@ services:
       retries: 20
     mem_limit: 512m
     restart: unless-stopped
+    logging: *logging
   migrate:
     build: .
     environment:
@@ -52,10 +60,11 @@ services:
       retries: 10
     mem_limit: 256m
     restart: unless-stopped
+    logging: *logging
   api:
     build: .
     environment: *product-env
-    ports: ['127.0.0.1:8000:8000']
+    ports: ['127.0.0.1:${APP_PORT:-8000}:8000']
     depends_on:
       sandbox: {condition: service_healthy}
     healthcheck:
@@ -64,6 +73,7 @@ services:
       retries: 10
     mem_limit: 384m
     restart: unless-stopped
+    logging: *logging
   worker:
     build: .
     environment: *product-env
@@ -72,5 +82,6 @@ services:
       api: {condition: service_healthy}
     mem_limit: 384m
     restart: unless-stopped
+    logging: *logging
 volumes:
   pgdata:

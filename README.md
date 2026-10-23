@@ -1,54 +1,76 @@
-# S(AI)pport
+# sAIpport
 
-A support engineer's workspace for investigating SaaS incidents, checking evidence, and approving narrowly scoped repairs.
+A support operations workspace that investigates SaaS incidents, gathers evidence, and executes narrowly scoped repairs after a human decision.
 
 [![checks](https://github.com/EshkirenokCode/S-AI-pport/actions/workflows/ci.yml/badge.svg)](https://github.com/EshkirenokCode/S-AI-pport/actions/workflows/ci.yml)
 
-![The working support desk](docs/media/workspace.png)
+[Open the demo](https://saipport.gulevskii.dev) · [Watch the walkthrough](docs/media/walkthrough.webm) · [Architecture](docs/architecture.md) · [Evaluation results](docs/evaluations.md)
 
-Three workflows share one execution model: a successful payment with missing access, failed integration deliveries, and product configuration questions. Every repair requires a human decision and a fresh state check. The connected business system is a synthetic, stateful HTTP service; it never handles real payments.
+![The support workspace: inbox, incident, investigation, and account context](docs/media/workspace.png)
 
-## Implementation
+## What it does
 
-Python 3.12, FastAPI, PostgreSQL 17, React, TypeScript, and a real stdio MCP adapter. A durable PostgreSQL worker handles investigations and approved repairs outside HTTP requests. OpenRouter supplies the optional live model; offline runs are explicitly labelled deterministic. Dependency versions are recorded in the Python lock file and npm lockfile.
+A customer reports a problem. The investigator reads account and event data through scoped MCP tools, finds the applicable versioned procedure, and returns evidence with a proposed next step. An operator reviews the exact event and expected effect. The worker executes the approved operation once, reads the account again, and prepares a customer reply.
 
-## Try it
+| Workflow | Investigation | Possible outcome |
+| --- | --- | --- |
+| Paid subscription, missing access | Payment, entitlement, failed event, recovery procedure | Approve reprocessing; verify Pro access |
+| Integration stopped delivering | Configuration, attempts, cooldown, destination response | Approve one eligible retry; verify acknowledgement |
+| Product setup question | Account version and applicable documentation | Grounded answer, clarification, or escalation |
 
-With Docker and Docker Compose installed:
+Permanent credential errors, conflicting payment records, stale state, missing evidence, and a repair without the expected effect require human review. Customer replies remain editable drafts; the application does not send them.
+
+The connected SaaS is a **synthetic, stateful HTTP laboratory** with its own database. Account reads, operation receipts, state changes, and verification actually occur. The demo has no real customers or payment processing.
+
+## Try the demo
+
+Open [saipport.gulevskii.dev](https://saipport.gulevskii.dev). Each visitor receives an isolated workspace with 14 sample tickets. No registration is required.
+
+1. Select **Paid for Pro, still on Free** and choose **Start investigation**.
+2. Review the findings and open **Recover a paid subscription v2.1**.
+3. Check the proposed event and effect, then choose **Approve & execute**.
+4. Confirm **Outcome verified** and the account's **Pro** plan. Edit and save the reply.
+5. Try an integration incident or setup question. In **Settings**, create an analyst workspace to test approval restrictions.
+
+The default **Offline** mode is a reproducible tool driver using the same real APIs, MCP, policies, worker, and verification. **Live** mode uses a free OpenRouter model to choose tools and write the findings. Live access depends on the configured development key, provider availability, and quotas. Errors stay visible; there is no paid fallback.
+
+[Approval screen](docs/media/approval.png) · [Verified repair](docs/media/repair-verified.png) · [Mobile workspace](docs/media/mobile.png)
+
+## Run locally
+
+With Docker and Docker Compose:
 
 ```sh
 python3 scripts/configure.py
 docker compose up --build --wait
 ```
 
-Open [the local workspace](http://127.0.0.1:8000). Configuration generates private random secrets in an ignored `.env`. The database and laboratory have no published ports. Starting a demo creates a new isolated workspace with synthetic accounts, 14 tickets, and versioned procedures.
+Open [localhost:8000](http://127.0.0.1:8000). Configuration generates random private secrets in an ignored `.env`. PostgreSQL and the laboratory have no published ports.
 
-For native development, install Python 3.12+, Node 24+, and PostgreSQL 17:
+Native development requires Python 3.12+, Node 24+, and PostgreSQL 17:
 
 ```sh
 make setup
 make dev
 ```
 
-Open [the development workspace](http://127.0.0.1:5173). The script uses its own PostgreSQL cluster on port 55432. Ctrl+C stops the application processes and retains that cluster. See [operations](docs/operations.md) for configuration and recovery.
+Open [localhost:5173](http://127.0.0.1:5173). The development script uses its own PostgreSQL cluster on port 55432. See [operations](docs/operations.md) for configuration and recovery.
 
-## Walk through an incident
+To enable live investigation, set `OPENROUTER_API_KEY` in `.env` and restart API/worker. `OPENROUTER_MODEL` defaults to `openrouter/free`; a pinned `:free` model can also be configured. Each call checks the current zero-price catalog and requires a zero-price provider route. The run records returned model IDs, token usage, reported cost, tool evidence, and outcome. Free-router selection can change between calls.
 
-1. Select **Paid for Pro, still on Free**, then **Start investigation**.
-2. Inspect the account/API evidence and the applicable billing procedure. No repair has happened yet.
-3. Review the exact event, expected effect, and account version. Choose **Approve & execute**.
-4. Watch the operation receipt and fresh verification. The account changes from Free to Pro and the customer reply becomes editable.
-5. Try the integration failure and retry-settings question. Permanent credential errors and missing evidence require review.
+## Implementation
 
-[Recorded browser walkthrough](docs/media/walkthrough.webm) · [Approval screenshot](docs/media/approval.png) · [Verified repair](docs/media/repair-verified.png) · [Mobile](docs/media/mobile.png)
+**Python 3.12 · FastAPI · PostgreSQL 17 · React · TypeScript · Vite · MCP · Docker Compose**
 
-## Live model
+- Durable PostgreSQL jobs with renewable leases, checkpoints, cancellation, and bounded recovery.
+- Seven typed tools through a real stdio MCP adapter. Delegated access binds tenant, actor, run, and the current worker lease.
+- Version-filtered lexical retrieval using PostgreSQL full-text search, a trusted ticket-family filter, and an evaluated fallback.
+- Backend-controlled proposals with an immutable payload, digest, expected account version, and operator-only decisions.
+- Idempotent external operations, receipt reconciliation, and fresh verification before declaring a successful repair.
+- Tenant-scoped sessions, request/run/model quotas, expiring sample workspaces, private service networks, and a non-root application image.
+- Responsive support workspace, SSE with polling fallback, accessible dialogs, persistent local draft edits, and observable execution records.
 
-Set `OPENROUTER_API_KEY` in `.env`, restart the API/worker, and choose **Live · OpenRouter free model** in workspace settings. `OPENROUTER_MODEL` defaults to `openrouter/free`. The adapter checks the current zero-price catalog and requires a zero-price provider route. It has no paid fallback.
-
-The live model chooses tools and writes the conclusion. It cannot approve or execute a repair. A run stores each returned model ID, token usage, reported cost, tools, evidence, and outcome. Free-router model selection can change between calls. Availability and rate limits are external dependencies; errors remain visible.
-
-Without a key, the deterministic provider drives the same real APIs, MCP, policy checks, worker, and verification. It is useful for reproducible tests and is visibly labelled **OFFLINE**.
+The model cannot approve its own action, execute arbitrary code, choose another tenant, issue refunds, or change credentials. Search is lexical; semantic embeddings are a documented future option, not an implemented feature.
 
 ## Verification
 
@@ -58,47 +80,35 @@ make test
 cd frontend && npx playwright install chromium && npm run test:e2e
 ```
 
-The local development database must be running for integration/browser tests. Tests use separate databases and never call a live model. CI checks the application and a separate Docker Compose workflow.
+Integration/browser tests use separate PostgreSQL databases and do not call a live model. CI runs the application suite and an independent container workflow.
 
 ```sh
-make eval                                      # deterministic workflow cases
+make eval
 PYTHONPATH=backend .venv/bin/python scripts/evaluate_retrieval.py
 PYTHONPATH=backend .venv/bin/python scripts/compare_retrieval.py
-make live                                      # explicit live calls, subject to provider quotas
+make live  # explicit calls to the configured free model
 ```
-
-The evaluation harness can reset fixtures only in its newly created local demo workspace. It is not an administrative product endpoint.
 
 Observed development results, 23 October 2026:
 
 | Check | Result | Scope |
 | --- | --- | --- |
-| Backend | 34 passing tests | Real PostgreSQL, HTTP laboratory and stdio MCP |
-| Browser | 6 passing tests | Three families, approval restriction, permanent error, mobile |
+| Backend | 40 passing tests | Real PostgreSQL, HTTP laboratory, MCP, permissions, cancellation, recovery, and retention |
+| Browser | 12 passing scenarios | Three workflows, decline/roles, draft recovery, keyboard dialogs, outage recovery, 320–1024px layouts, automated WCAG A/AA checks |
 | Workflow evaluation | 36/36 expected outcomes; zero duplicate effects | Deterministic driver; 24 development and 12 holdout cases |
-| Retrieval | 20/24 baseline → 21/24 with topic/fallback; 0/6 → 6/6 on long queries | Four applicable synthetic documents; lexical search |
-| Live smoke | Three canonical families completed; current billing rechecked | 15 canonical free-router calls + 6 current pinned-model calls; reported cost $0 |
+| Retrieval | 20/24 baseline → 21/24; long queries 0/6 → 6/6 | Four applicable synthetic documents; lexical retrieval |
+| Live development checks | Three canonical families completed; billing also checked on a pinned free model | Stored model/tool traces; provider-reported cost $0 |
 
-These are small synthetic checks, not general LLM accuracy or production-impact claims. See [evaluation methodology and raw reports](docs/evaluations.md).
+These are small synthetic checks, not general LLM accuracy, a complete accessibility audit, or measured production impact. Historical live failures are retained alongside successful runs. See [methodology and raw reports](docs/evaluations.md) and the [release audit](docs/release-audit.md).
 
-## What the safety boundary does
+## Deployment and boundaries
 
-Every read and mutation is scoped to the authenticated demo workspace. Analysts can investigate; operators can decide on a proposal. An approval binds to an immutable payload and digest. The executor rechecks the approver and account version, uses an external idempotency receipt, and verifies the resulting state. A successful HTTP response without the expected effect is escalated, never shown as a successful repair.
+[Public demo deployment](deploy/README.md) describes the separate Compose stack, reverse proxy, HTTPS, quotas, backup, and rollback. Runtime secrets remain outside Git. The demo is separate from the author's portfolio and other server applications.
 
-The public repository is runnable; it is not a deployed multi-customer service. The laboratory is synthetic, demo role selection is not production sign-in, retrieval is lexical rather than semantic, and live models can fail. There is no Stripe connector, remote MCP OAuth server, refund capability, or arbitrary URL/SQL/shell execution. See [limitations](docs/limitations.md).
+This release is a runnable portfolio demonstration. Production adoption requires real business connectors, production identity and access management, organization-specific policies, and validation against real support cases. The laboratory's destination acknowledgement is simulated state, not a request to an external receiver. See [limitations](docs/limitations.md).
 
-## Design documents
+## Project notes
 
-- [Product and delivery plan](docs/plan.md)
-- [Architecture and data](docs/architecture.md)
-- [API and tool contracts](docs/contracts.md)
-- [Permissions and threat model](docs/security.md)
-- [Test strategy](docs/testing.md)
-- [Architecture decisions](docs/adr/001-execution.md)
-- [Retrieval decision](docs/adr/002-retrieval.md)
-- [Operations and backup/restore](docs/operations.md)
-- [Engineering decisions](docs/engineering.md)
-
-## Author
+[Product plan](docs/plan.md) · [API/tool contracts](docs/contracts.md) · [Security model](docs/security.md) · [Test strategy](docs/testing.md) · [Execution ADR](docs/adr/001-execution.md) · [Retrieval ADR](docs/adr/002-retrieval.md) · [Engineering decisions](docs/engineering.md)
 
 Ilia Gulevskii · [gulevskii.dev](https://gulevskii.dev/)

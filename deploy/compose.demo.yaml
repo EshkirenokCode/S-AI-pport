@@ -1,0 +1,29 @@
+# docker compose -f compose.yaml -f deploy/compose.demo.yaml up -d --build --wait
+services:
+  api:
+    command: [uvicorn, 'app.main:app', --host, '0.0.0.0', --port, '8000', --proxy-headers, --forwarded-allow-ips, '172.30.40.2', --log-level, warning]
+    networks:
+      default: {}
+      edge:
+        ipv4_address: 172.30.40.3
+    read_only: true
+    tmpfs: ['/tmp:size=32m,mode=1777']
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    pids_limit: 128
+  worker:
+    read_only: true
+    tmpfs: ['/tmp:size=32m,mode=1777']
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    pids_limit: 128
+  sandbox:
+    read_only: true
+    tmpfs: ['/tmp:size=32m,mode=1777']
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    pids_limit: 128
+networks:
+  edge:
+    external: true
+    name: saipport-edge

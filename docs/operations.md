@@ -43,8 +43,8 @@ For an offline local backup, stop API/worker/laboratory, retain PostgreSQL, and 
 
 For Compose, run `pg_dump` inside the postgres container as its administrative user, once for `saipport` and once for `saipport_lab`, redirecting outputs to private local files. For restore, provision empty databases with the matching owners, use `pg_restore --no-owner` under the respective database owner, and run migrations before restarting services. Test restores in an isolated environment. No automatic backup scheduler is included.
 
-## Publishing later
+## Public demonstration
 
-Use a separate deployment environment. Configure an explicit HTTPS origin, `SECURE_COOKIES=true`, and proxy trust restricted to the actual reverse proxy. PostgreSQL and the lab remain private; never publish their ports. Keep global and per-workspace quotas, resource limits, and sandbox-only roles in place. Add a separate ingress/session policy if exposing an anonymous demo at scale.
+The isolated HTTPS demo and its reverse-proxy, quotas, retention, backup, and rollback procedures are documented in [deploy/README.md](../deploy/README.md). The portfolio and existing server projects are not application deployment targets.
 
-The existing portfolio and other projects are not deployment targets for these commands. No public deployment or production identity provider is included in this delivery.
+Global provisioning is capped by `GLOBAL_SESSIONS_PER_HOUR` (default 100), concurrent queued/running work by `GLOBAL_ACTIVE_RUNS` (default 20; public host uses 6), and per-client sessions by `SESSION_LIMIT_PER_HOUR`. Worker maintenance removes expired synthetic workspaces in batches of 20 every ten minutes. Public cookies are secure and the allowed origin is explicit.

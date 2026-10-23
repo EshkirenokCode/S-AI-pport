@@ -31,7 +31,7 @@ async def lifespan(app):
     await app.state.db.close()
 
 
-app = FastAPI(title="S(AI)pport", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="S(AI)pport", version="0.2.0", lifespan=lifespan)
 
 
 @app.middleware("http")
@@ -355,6 +355,7 @@ async def draft(run_id: UUID, body: Draft, request: Request, actor=Depends(ident
             "UPDATE runs SET result=jsonb_set(result,'{reply}',%s) WHERE id=%s AND tenant_id=%s",
             (js(body.reply), run_id, actor["tenant_id"]),
         )
+    await db.audit(actor["tenant_id"], actor["id"], "draft.saved", run_id, run_id)
     return {"saved": True}
 
 

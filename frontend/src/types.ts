@@ -100,3 +100,14 @@ export type Session = {
   transport: string;
   live_available: boolean;
 };
+
+export type Metrics = {
+  runs: { status: string; count: number }[];
+  usage: {
+    calls: number;
+    tokens: number | string;
+    reported_cost: number | string | null;
+    average_latency_ms: number | string | null;
+  };
+  audit: { verb: string; object_id: string; created_at: string }[];
+};

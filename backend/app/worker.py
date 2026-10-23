@@ -85,13 +85,21 @@ class Worker:
         async with self.db.pool.connection() as c, c.transaction():
             current = await (
                 await c.execute(
-                    "SELECT id FROM runs WHERE id=%s AND lease_owner=%s AND status='running' FOR UPDATE",
+                    "SELECT id,result FROM runs WHERE id=%s AND lease_owner=%s AND status='running' FOR UPDATE",
                     (run["id"], self.owner),
                 )
             ).fetchone()
             if not current:
                 return
             if status in ("needs_human", "failed", "cancelled"):
+                if current["result"].get("disposition") == "propose_action":
+                    result = {
+                        **current["result"],
+                        "disposition": "needs_human",
+                        "summary": "The repair could not be verified. Review the execution record before taking another action.",
+                        "reply": "We are reviewing the account issue and cannot confirm restoration yet. The case requires further investigation.",
+                    }
+                    await c.execute("UPDATE runs SET result=%s WHERE id=%s", (js(result), run["id"]))
                 await c.execute(
                     "UPDATE actions SET status=%s WHERE run_id=%s AND status IN ('pending','approved')",
                     ("cancelled" if status == "cancelled" else "failed", run["id"]),

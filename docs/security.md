@@ -10,7 +10,7 @@
 | Read another workspace | No | No | No |
 | Change credentials, charges, refunds, roles | No | No | No |
 
-Anonymous demo visitors receive an isolated synthetic tenant and an expiring session. Role selection is a demo fixture, not production authentication. Public exposure requires quotas, secure cookies, explicit trusted-proxy configuration, and a separate environment. Administrative database access is never a tool.
+Anonymous demo visitors receive an isolated synthetic tenant and an expiring session. Role selection is a demo fixture, not production authentication. The public demo uses quotas, secure cookies, an exact trusted-proxy address, isolated service networks, and a separate environment. Administrative database access is never a tool.
 
 ## Trust boundaries
 
@@ -26,3 +26,7 @@ Anonymous demo visitors receive an isolated synthetic tenant and an expiring ses
 ## Negative verification
 
 Cross-tenant IDs, insufficient role, forged confirmation in a ticket, changed proposal digest, stale source/state, simultaneous approval, duplicate jobs, transient/permanent HTTP failures, injected instructions, missing evidence, cancellation, lease recovery, exhausted budgets, malformed tool calls, and failed post-action verification.
+
+## Public demo release
+
+MCP delegation includes the owning worker lease and rejects expired/stale owners. The public ingress applies request/connection limits and overwrites forwarded client headers; Uvicorn trusts only the proxy's dedicated edge address. Database-enforced global session and queue caps complement per-workspace budgets. Expired synthetic tenants are removed by bounded maintenance; the laboratory deletion endpoint is service-authenticated and private. See [deployment](../deploy/README.md).
