@@ -33,7 +33,7 @@ test("billing: inspect, approve, verify, and edit the reply", async ({
     .getByRole("button", { name: "Approve & execute", exact: true })
     .click();
   await expect(
-    page.getByText("OUTCOME VERIFIED", { exact: true }),
+    page.getByText("Outcome verified", { exact: true }),
   ).toBeVisible();
   await expect(page.locator(".plan-pill")).toHaveText("Pro");
   await expect(
@@ -66,7 +66,7 @@ test("integration: a real retry is acknowledged", async ({ page }) => {
     .getByRole("button", { name: "Approve & execute", exact: true })
     .click();
   await expect(
-    page.getByText("OUTCOME VERIFIED", { exact: true }),
+    page.getByText("Outcome verified", { exact: true }),
   ).toBeVisible();
   await expect(page.locator(".findings h3")).toContainText(
     "destination acknowledgement",

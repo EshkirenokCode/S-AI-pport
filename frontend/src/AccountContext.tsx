@@ -1,11 +1,4 @@
-import {
-  X,
-  ShieldCheck,
-  Layers,
-  FileText,
-  ArrowUpRight,
-  LockKeyhole,
-} from "lucide-react";
+import { X } from "lucide-react";
 import type { Account } from "./types";
 export function AccountContext({
   account,
@@ -38,13 +31,6 @@ export function AccountContext({
       </div>
       {account ? (
         <>
-          <div className="company-mark">
-            {account.company
-              .split(" ")
-              .map((w) => w[0])
-              .join("")
-              .slice(0, 2)}
-          </div>
           <h3 className="company-name">{account.company}</h3>
           <p className="company-sub">{customer}'s workspace</p>
           <dl className="context-facts">
@@ -88,37 +74,13 @@ export function AccountContext({
               <dd className="mono">{account.id.slice(0, 8)}…</dd>
             </div>
           </dl>
-          <div className="context-divider" />
-          <div className="section-kicker">THIS WORKSPACE</div>
-          <div className="boundary">
-            <ShieldCheck size={16} />
-            <div>
-              <strong>Human approval required</strong>
-              <p>
-                Repairs apply to one event. Permissions and account state are
-                checked again before execution.
-              </p>
-            </div>
-          </div>
-          <div className="boundary">
-            <Layers size={16} />
-            <div>
-              <strong>Isolated sample data</strong>
-              <p>All accounts and payments belong to this demo session.</p>
-            </div>
-          </div>
           <button className="context-trace" onClick={onInspect}>
-            <FileText size={15} />
-            <span>Inspect execution record</span>
-            <ArrowUpRight size={15} />
+            View run details
           </button>
         </>
       ) : (
         <div className="skeleton-block" />
       )}
-      <div className="context-footer">
-        <LockKeyhole size={12} /> Private to your demo session
-      </div>
     </aside>
   );
 }

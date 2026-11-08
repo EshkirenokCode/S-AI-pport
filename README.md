@@ -1,6 +1,6 @@
 # sAIpport
 
-A support operations workspace that investigates SaaS incidents, gathers evidence, and executes narrowly scoped repairs after a human decision.
+A support desk for SaaS tickets. It reads account data and product documentation, proposes a repair, and checks the result after an operator approves it.
 
 [![checks](https://github.com/EshkirenokCode/S-AI-pport/actions/workflows/ci.yml/badge.svg)](https://github.com/EshkirenokCode/S-AI-pport/actions/workflows/ci.yml)
 

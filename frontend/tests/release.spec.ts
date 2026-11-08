@@ -18,7 +18,7 @@ test("unsaved reply survives switching tickets and reloading", async ({
     .getByRole("button", { name: "Approve & execute", exact: true })
     .click();
   await expect(
-    page.getByText("OUTCOME VERIFIED", { exact: true }),
+    page.getByText("Outcome verified", { exact: true }),
   ).toBeVisible();
   await page
     .getByRole("textbox", { name: "Customer reply draft" })

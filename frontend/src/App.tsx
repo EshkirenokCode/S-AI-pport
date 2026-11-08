@@ -8,7 +8,6 @@ import {
   Check,
   CheckCheck,
   ChevronDown,
-  ChevronRight,
   CircleHelp,
   Clock,
   Copy,
@@ -19,12 +18,10 @@ import {
   LoaderCircle,
   LockKeyhole,
   MessageSquare,
-  MoreHorizontal,
   Search,
   Settings2,
   ShieldCheck,
   SlidersHorizontal,
-  Sparkles,
   Square,
   TriangleAlert,
   Unplug,
@@ -150,7 +147,8 @@ export default function App() {
     draftDirty = useRef(false),
     draftRevision = useRef(0),
     selectedRef = useRef(selected),
-    draftRef = useRef(draft);
+    draftRef = useRef(draft),
+    casePanel = useRef<HTMLElement>(null);
   draftRef.current = draft;
   selectedRef.current = selected;
   const loadQueue = useCallback(async () => {
@@ -216,6 +214,7 @@ export default function App() {
   useEffect(() => {
     if (!selected) return;
     let active = true;
+    casePanel.current?.scrollTo(0, 0);
     setDetail(null);
     setRun(null);
     setTab("investigation");
@@ -440,11 +439,11 @@ export default function App() {
   if (!session)
     return (
       <div className="boot">
-        <div className="brand-icon">
-          s<span>✳</span>
-        </div>
+        <span className="brand-mark" aria-hidden="true">
+          <Inbox size={18} />
+        </span>
         <h1>Opening your workspace</h1>
-        <p>Preparing an isolated demo with synthetic accounts.</p>
+        <p>Loading the sample tickets.</p>
         {error ? (
           <>
             <p role="alert" className="boot-error">
@@ -464,915 +463,751 @@ export default function App() {
       <a className="skip-link" href="#ticket-workspace">
         Skip to ticket
       </a>
-      <nav className="rail" aria-label="Main navigation">
-        <a className="brand" href="/" aria-label="S(AI)pport home">
-          <span className="brand-mark">
-            s<span>/</span>
+      <header className="masthead">
+        <a className="brand" href="/" aria-label="sAIpport home">
+          <span className="brand-mark" aria-hidden="true">
+            <Inbox size={17} />
           </span>
-          <span>
-            sAIpport<span className="brand-caption">SUPPORT OPERATIONS</span>
-          </span>
+          <span>sAIpport</span>
         </a>
-        <button
-          className="workspace-switch"
-          onClick={() => setModal("settings")}
-        >
-          <span className="workspace-letter">A</span>
-          <span>
-            Acme Support<small>Demo workspace</small>
-          </span>
-          <ChevronDown size={14} />
-        </button>
-        <div className="nav-caption">WORKSPACE</div>
-        <div className="rail-group">
+        <nav className="desk-nav" aria-label="Ticket views">
+          {[
+            ["all", "Inbox", "Ticket queue"],
+            ["approval", "Approvals", "Approvals"],
+            ["resolved", "Resolved", "Resolved tickets"],
+          ].map(([value, name, ariaLabel]) => {
+            const active =
+              value === "all"
+                ? ["all", "open"].includes(filter)
+                : filter === value;
+            return (
+              <button
+                key={value}
+                className={active ? "active" : ""}
+                aria-label={ariaLabel}
+                aria-pressed={active}
+                onClick={() => {
+                  setFilter(value);
+                  setContextOpen(false);
+                  setMobileQueue(true);
+                }}
+              >
+                {name}
+                {value === "approval" && waiting > 0 && <span>{waiting}</span>}
+              </button>
+            );
+          })}
+        </nav>
+        <div className="desk-tools">
+          <span className="demo-badge">Sample data</span>
           <button
-            className={
-              "rail-button " +
-              (["all", "open"].includes(filter) ? "selected" : "")
-            }
-            aria-label="Ticket queue"
-            onClick={() => {
-              setFilter("all");
-              setMobileQueue(true);
-              setModal(null);
-            }}
-          >
-            <Inbox size={18} />
-            <span>Inbox</span>
-            <b>{tickets.filter((t) => t.status !== "resolved").length}</b>
-          </button>
-          <button
-            aria-label="Approvals"
-            className={
-              "rail-button " + (filter === "approval" ? "selected" : "")
-            }
-            onClick={() => {
-              setFilter("approval");
-              setMobileQueue(true);
-            }}
-          >
-            <ShieldCheck size={18} />
-            <span>Approvals</span>
-            {waiting > 0 && <b className="approval-count">{waiting}</b>}
-          </button>
-          <button
-            aria-label="Resolved tickets"
-            className={
-              "rail-button " + (filter === "resolved" ? "selected" : "")
-            }
-            onClick={() => {
-              setFilter("resolved");
-              setMobileQueue(true);
-            }}
-          >
-            <CheckCheck size={18} />
-            <span>Resolved</span>
-          </button>
-          <button
-            className="rail-button"
+            className="icon-button"
             aria-label="Workspace activity"
+            title="Workspace activity"
             onClick={() => void activity()}
           >
-            <Activity size={18} />
-            <span>Activity</span>
+            <Activity size={17} />
           </button>
-        </div>
-        <div className="sidebar-note">
-          <span className="small-dot succeeded" /> Sandbox environment
-          <p>
-            Explore real workflows
-            <br />
-            with sample customer data.
-          </p>
-          <button onClick={() => setModal("help")}>
-            How the demo works <ArrowUpRight size={13} />
-          </button>
-        </div>
-        <div className="rail-bottom">
           <button
-            className="rail-button"
+            className="icon-button"
             aria-label="Demo guide"
+            title="Demo guide"
             onClick={() => setModal("help")}
           >
-            <CircleHelp size={18} />
-            <span>Quick guide</span>
+            <CircleHelp size={17} />
           </button>
           <button
-            className="rail-button"
+            className="operator-switch"
             aria-label="Workspace settings"
+            title="Workspace settings"
             onClick={() => setModal("settings")}
           >
-            <Settings2 size={18} />
-            <span>Settings</span>
+            <Settings2 size={16} />
+            <span>{session.role === "analyst" ? "Analyst" : "Operator"}</span>
           </button>
-          <a
-            className="author-link"
-            href="https://gulevskii.dev/"
-            target="_blank"
-            rel="noreferrer"
-          >
-            <span className="operator-avatar">IG</span>
-            <span>
-              Ilia Gulevskii
-              <small>
-                Project portfolio <ArrowUpRight size={11} />
-              </small>
-            </span>
-          </a>
         </div>
-      </nav>
-      <div className="workspace">
-        <header className="topbar">
-          <div className="topbar-title">
-            <Inbox size={17} />
-            <span>Support inbox</span>
-            <ChevronRight size={13} />
-            <span className="muted">
-              {filter === "approval"
-                ? "Awaiting approval"
-                : filter === "resolved"
-                  ? "Resolved"
-                  : "All conversations"}
-            </span>
+      </header>
+      <main className={mobileQueue ? "desk queue-open" : "desk"}>
+        <aside
+          aria-label="Ticket inbox"
+          className={"queue " + (mobileQueue ? "mobile-open" : "")}
+        >
+          <div className="queue-heading">
+            <h2>
+              {filter === "resolved"
+                ? "Resolved"
+                : filter === "approval"
+                  ? "Approvals"
+                  : "Tickets"}
+            </h2>
+            <span className="mono">{visible.length} tickets</span>
           </div>
-          <div className="topbar-right">
-            <span className="demo-badge">
-              <span /> Synthetic demo
-            </span>
-            <button
-              className="operator-switch"
-              onClick={() => setModal("settings")}
-              aria-label="Change workspace role"
-            >
-              <span className="tiny-avatar">
-                {session?.role === "analyst" ? "DA" : "DO"}
-              </span>
-              <span>
-                {session?.role === "analyst" ? "Analyst" : "Operator"}
-              </span>
-              <ChevronDown size={13} />
-            </button>
-          </div>
-        </header>
-        <main className="desk">
-          <aside
-            aria-label="Ticket inbox"
-            className={"queue " + (mobileQueue ? "mobile-open" : "")}
-          >
-            <div className="queue-heading">
-              <h2>
-                Conversations <span>{visible.length}</span>
-              </h2>
-              <button
-                className="icon-button"
-                aria-label="Inbox filters"
-                onClick={() =>
-                  setFilter((v) => (v === "approval" ? "all" : "approval"))
-                }
-              >
-                <SlidersHorizontal size={17} />
-              </button>
-            </div>
-            <label className="search">
-              <Search size={16} />
-              <input
-                placeholder="Search tickets…"
-                aria-label="Search tickets"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-            </label>
+          <label className="search">
+            <Search size={16} />
+            <input
+              placeholder="Search by name or ticket"
+              aria-label="Search tickets"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </label>
+          {["all", "open"].includes(filter) && (
             <div className="queue-filters">
               {[
-                ["all", "All tickets"],
+                ["all", "All"],
                 ["open", "Open"],
-                ["approval", "Approval"],
-              ].map(([v, l]) => (
+              ].map(([value, name]) => (
                 <button
-                  key={v}
-                  className={filter === v ? "active" : ""}
-                  onClick={() => setFilter(v)}
+                  key={value}
+                  className={filter === value ? "active" : ""}
+                  aria-pressed={filter === value}
+                  onClick={() => setFilter(value)}
                 >
-                  {l}
-                  {v === "approval" && waiting > 0 ? (
-                    <span>{waiting}</span>
-                  ) : null}
+                  {name}
                 </button>
               ))}
             </div>
-            <div className="ticket-list">
-              {visible.map((ticket) => (
+          )}
+          <div className="ticket-list">
+            {visible.map((ticket) => (
+              <button
+                key={ticket.id}
+                aria-current={selected === ticket.id ? "true" : undefined}
+                className={
+                  "ticket-row " + (selected === ticket.id ? "active" : "")
+                }
+                onClick={() => {
+                  setSelected(ticket.id);
+                  setMobileQueue(false);
+                }}
+              >
+                <div className="ticket-row-top">
+                  <span className="ticket-number">#{ticket.number}</span>
+                  <span className="customer-name">{ticket.customer}</span>
+                </div>
+                <h3>{ticket.subject}</h3>
+                <div className="ticket-row-bottom">
+                  <span className="family-tag">
+                    {familyIcon(ticket.family)}
+                    {ticket.family}
+                  </span>
+                  <span
+                    className={"ticket-status " + (ticket.run_status || "open")}
+                  >
+                    <i />
+                    {ticket.run_status === "waiting_for_approval"
+                      ? "Approval"
+                      : ticket.run_status
+                        ? label(ticket.run_status)
+                        : "Open"}
+                  </span>
+                </div>
+              </button>
+            ))}
+            {visible.length === 0 && (
+              <div className="empty-small">
+                <p>No tickets match your filters.</p>
                 <button
-                  key={ticket.id}
-                  aria-current={selected === ticket.id ? "true" : undefined}
-                  className={
-                    "ticket-row " + (selected === ticket.id ? "active" : "")
-                  }
                   onClick={() => {
-                    setSelected(ticket.id);
-                    setMobileQueue(false);
+                    setQuery("");
+                    setFilter("all");
                   }}
                 >
-                  <div className="ticket-row-top">
-                    <span
-                      className={"customer-avatar tone-" + (ticket.number % 4)}
-                    >
-                      {initials(ticket.customer)}
-                    </span>
-                    <span className="customer-name">{ticket.customer}</span>
-                    <span className="ticket-number">#{ticket.number}</span>
-                  </div>
-                  <h3>{ticket.subject}</h3>
-                  <p>{ticket.body}</p>
-                  <div className="ticket-row-bottom">
-                    <span className="family-tag">
-                      {familyIcon(ticket.family)}
-                      {ticket.family}
-                    </span>
-                    <span
-                      className={
-                        "ticket-status " + (ticket.run_status || "open")
-                      }
-                    >
-                      <i />
-                      {ticket.run_status === "waiting_for_approval"
-                        ? "Approval"
-                        : ticket.run_status
-                          ? label(ticket.run_status)
-                          : "Open"}
-                    </span>
-                  </div>
-                </button>
-              ))}
-              {visible.length === 0 && (
-                <div className="empty-small">
-                  <Search />
-                  <p>No tickets match this view.</p>
-                  <button
-                    onClick={() => {
-                      setQuery("");
-                      setFilter("all");
-                    }}
-                  >
-                    Clear filters
-                  </button>
-                </div>
-              )}
-            </div>
-            <div className="queue-foot">
-              <LockKeyhole size={13} /> Your own isolated workspace
-            </div>
-          </aside>
-          <section
-            tabIndex={-1}
-            id="ticket-workspace"
-            aria-label="Selected ticket"
-            className="case-panel"
-          >
-            {error && (
-              <div className="error-banner" role="alert">
-                <TriangleAlert size={17} />
-                <span>{error}</span>
-                <button aria-label="Dismiss error" onClick={() => setError("")}>
-                  <X size={15} />
+                  Clear filters
                 </button>
               </div>
             )}
-            {!detail ? (
-              <div className="panel-loading">
-                <LoaderCircle className="spin" />
-                <p>
-                  {error
-                    ? "The workspace could not be loaded."
-                    : "Loading ticket…"}
-                </p>
-                {error && (
-                  <button
-                    className="primary-button"
-                    onClick={() => void bootstrap()}
-                  >
-                    Retry
-                  </button>
-                )}
+          </div>
+          <div className="queue-foot">
+            <a
+              href="https://gulevskii.dev/#saipport"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Project by Ilia Gulevskii <ArrowUpRight size={13} />
+            </a>
+          </div>
+        </aside>
+        <section
+          ref={casePanel}
+          tabIndex={-1}
+          id="ticket-workspace"
+          aria-label="Selected ticket"
+          className="case-panel"
+        >
+          {error && (
+            <div className="error-banner" role="alert">
+              <TriangleAlert size={17} />
+              <span>{error}</span>
+              <button aria-label="Dismiss error" onClick={() => setError("")}>
+                <X size={15} />
+              </button>
+            </div>
+          )}
+          {!detail ? (
+            <div className="panel-loading">
+              <LoaderCircle className="spin" />
+              <p>
+                {error
+                  ? "The workspace could not be loaded."
+                  : "Loading ticket…"}
+              </p>
+              {error && (
+                <button
+                  className="primary-button"
+                  onClick={() => void bootstrap()}
+                >
+                  Retry
+                </button>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="case-header">
+                <button
+                  className="mobile-back icon-button"
+                  aria-label="Back to inbox"
+                  onClick={() => setMobileQueue(true)}
+                >
+                  <ArrowLeft size={18} />
+                </button>
+                <span className="ticket-number">Ticket #{t!.number}</span>
+                <span className={"priority " + t!.priority}>
+                  <span />
+                  {t!.priority === "high" ? "High priority" : "Normal priority"}
+                </span>
               </div>
-            ) : (
-              <>
-                <div className="case-header">
-                  <button
-                    className="mobile-back icon-button"
-                    aria-label="Back to inbox"
-                    onClick={() => setMobileQueue(true)}
-                  >
-                    <ArrowLeft size={18} />
-                  </button>
-                  <div className="breadcrumbs">
-                    <span>Inbox</span>
-                    <ChevronRight size={12} />
-                    <span>#{t!.number}</span>
+              <div className="customer-message">
+                <div className="ticket-title">
+                  <h2>{t!.subject}</h2>
+                </div>
+                <div className="message-meta">
+                  <div className={"customer-avatar tone-" + (t!.number % 4)}>
+                    {initials(t!.customer)}
                   </div>
-                  <span className={"priority " + t!.priority}>
-                    <span />
-                    {t!.priority === "high"
-                      ? "High priority"
-                      : "Normal priority"}
+                  <div>
+                    <strong>{t!.customer}</strong>
+                    <span>{t!.email}</span>
+                  </div>
+                  <span className="message-channel">
+                    <MessageSquare size={13} />
+                    Customer message
+                  </span>
+                </div>
+                <p className="message-bubble">{t!.body}</p>
+                <div className="message-tags">
+                  <span>
+                    {familyIcon(t!.family)}
+                    {t!.family}
+                  </span>
+                  <span>
+                    <Layers size={13} /> Product{" "}
+                    {detail.account.product_version}
                   </span>
                   <button
-                    className="icon-button"
-                    aria-label="Ticket details"
-                    onClick={() =>
-                      setTab(tab === "details" ? "investigation" : "details")
-                    }
+                    className="mobile-context-button"
+                    onClick={() => setContextOpen((v) => !v)}
+                    aria-expanded={contextOpen}
+                    aria-controls="account-context"
                   >
-                    <MoreHorizontal size={18} />
+                    <CreditCard size={13} /> Account details{" "}
+                    <ChevronDown size={13} />
                   </button>
                 </div>
-                <div className="customer-message">
-                  <div className="ticket-title">
-                    <h2>{t!.subject}</h2>
-                  </div>
-                  <div className="message-meta">
-                    <div className={"customer-avatar tone-" + (t!.number % 4)}>
-                      {initials(t!.customer)}
-                    </div>
-                    <div>
-                      <strong>{t!.customer}</strong>
-                      <span>{t!.email}</span>
-                    </div>
-                    <span className="message-channel">
-                      <MessageSquare size={13} />
-                      Customer message
-                    </span>
-                  </div>
-                  <p className="message-bubble">{t!.body}</p>
-                  <div className="message-tags">
-                    <span>
-                      {familyIcon(t!.family)}
-                      {t!.family}
-                    </span>
-                    <span>
-                      <Layers size={13} /> Product{" "}
-                      {detail.account.product_version}
-                    </span>
-                    <button
-                      className="mobile-context-button"
-                      onClick={() => setContextOpen((v) => !v)}
-                      aria-expanded={contextOpen}
-                      aria-controls="account-context"
-                    >
-                      <CreditCard size={13} /> Account details{" "}
-                      <ChevronDown size={13} />
-                    </button>
-                  </div>
-                </div>
-                <div className="case-tabs">
-                  <button
-                    className={tab === "investigation" ? "active" : ""}
-                    onClick={() => setTab("investigation")}
-                  >
-                    <Sparkles size={15} />
-                    Investigation
-                    {run && <span className="tab-count">{tools.length}</span>}
-                  </button>
-                  <button
-                    className={tab === "evidence" ? "active" : ""}
-                    onClick={() => setTab("evidence")}
-                  >
-                    <BookOpen size={15} />
-                    Sources<span className="tab-count">{sources.length}</span>
-                  </button>
-                  <button
-                    className={tab === "details" ? "active" : ""}
-                    onClick={() => setTab("details")}
-                  >
-                    <FileText size={15} />
-                    Run details
-                  </button>
-                </div>
-                <div className="case-body">
-                  {tab === "evidence" ? (
-                    <div className="sources-view">
-                      <div className="section-kicker">KNOWLEDGE BASE</div>
-                      <h3>Documentation sources</h3>
-                      <p className="muted">
-                        Versioned procedures used in this investigation. Account
-                        facts are available in the timeline.
-                      </p>
-                      {sources.map((s) => (
-                        <button
-                          className="source-card"
-                          key={s.id}
-                          onClick={() => void openSource(s)}
-                        >
-                          <BookOpen size={20} />
-                          <div>
-                            <strong>{s.title}</strong>
-                            <span>
-                              Version {s.version} · {s.source_key}
-                            </span>
-                            <p>{s.body?.slice(0, 150)}…</p>
-                          </div>
-                          <ArrowUpRight size={18} />
-                        </button>
-                      ))}
-                      {!sources.length && (
-                        <div className="empty-small">
-                          <BookOpen />
-                          <p>Sources appear after documentation is searched.</p>
+              </div>
+              <div className="case-tabs">
+                <button
+                  className={tab === "investigation" ? "active" : ""}
+                  onClick={() => setTab("investigation")}
+                >
+                  <Search size={15} />
+                  Investigation
+                  {run && <span className="tab-count">{tools.length}</span>}
+                </button>
+                <button
+                  className={tab === "evidence" ? "active" : ""}
+                  onClick={() => setTab("evidence")}
+                >
+                  <BookOpen size={15} />
+                  Sources<span className="tab-count">{sources.length}</span>
+                </button>
+                <button
+                  className={tab === "details" ? "active" : ""}
+                  onClick={() => setTab("details")}
+                >
+                  <FileText size={15} />
+                  Run details
+                </button>
+              </div>
+              <div className="case-body">
+                {tab === "evidence" ? (
+                  <div className="sources-view">
+                    <h3>Documentation sources</h3>
+                    <p className="muted">
+                      Procedures used in this run. See the activity log for
+                      account data.
+                    </p>
+                    {sources.map((s) => (
+                      <button
+                        className="source-card"
+                        key={s.id}
+                        onClick={() => void openSource(s)}
+                      >
+                        <BookOpen size={20} />
+                        <div>
+                          <strong>{s.title}</strong>
+                          <span>
+                            Version {s.version} · {s.source_key}
+                          </span>
+                          <p>{s.body?.slice(0, 150)}…</p>
                         </div>
-                      )}
-                    </div>
-                  ) : tab === "details" ? (
-                    <div className="run-details">
-                      <h3>Execution record</h3>
-                      {run ? (
-                        <>
-                          <dl>
-                            {[
-                              ["Run ID", run.id],
-                              ["State", label(run.status)],
-                              [
-                                "Provider",
-                                run.provider === "deterministic"
-                                  ? "Deterministic · offline"
-                                  : "OpenRouter · live",
-                              ],
-                              ["Returned model", run.model || "Not applicable"],
-                              ["Prompt", run.prompt_version],
-                              ["Worker acquisitions", String(run.attempts)],
-                              ["Tool transport", session?.transport || ""],
-                              ["Tool calls", String(tools.length)],
-                              ["Model calls", String(run.usage.length)],
-                              [
-                                "Reported cost",
-                                run.usage.length
-                                  ? run.usage.some((u) => u.cost === null)
-                                    ? "Not reported"
-                                    : "$" +
-                                      run.usage
-                                        .reduce(
-                                          (a, u) => a + Number(u.cost || 0),
-                                          0,
-                                        )
-                                        .toFixed(6)
-                                  : "No model calls",
-                              ],
-                            ].map(([k, v]) => (
-                              <div key={k}>
-                                <dt>{k}</dt>
-                                <dd>{v}</dd>
-                              </div>
-                            ))}
-                          </dl>
-                          <p className="hint">
-                            The run ID connects the worker, tool evidence,
-                            approval, and operation receipt. Private model
-                            reasoning is never displayed.
-                          </p>
-                        </>
-                      ) : (
-                        <p className="muted">
-                          Start an investigation to create an execution record.
+                        <ArrowUpRight size={18} />
+                      </button>
+                    ))}
+                    {!sources.length && (
+                      <div className="empty-small">
+                        <BookOpen />
+                        <p>Sources appear after documentation is searched.</p>
+                      </div>
+                    )}
+                  </div>
+                ) : tab === "details" ? (
+                  <div className="run-details">
+                    <h3>Execution record</h3>
+                    {run ? (
+                      <>
+                        <dl>
+                          {[
+                            ["Run ID", run.id],
+                            ["State", label(run.status)],
+                            [
+                              "Provider",
+                              run.provider === "deterministic"
+                                ? "Deterministic · offline"
+                                : "OpenRouter · live",
+                            ],
+                            ["Returned model", run.model || "Not applicable"],
+                            ["Prompt", run.prompt_version],
+                            ["Worker acquisitions", String(run.attempts)],
+                            ["Tool transport", session?.transport || ""],
+                            ["Tool calls", String(tools.length)],
+                            ["Model calls", String(run.usage.length)],
+                            [
+                              "Reported cost",
+                              run.usage.length
+                                ? run.usage.some((u) => u.cost === null)
+                                  ? "Not reported"
+                                  : "$" +
+                                    run.usage
+                                      .reduce(
+                                        (a, u) => a + Number(u.cost || 0),
+                                        0,
+                                      )
+                                      .toFixed(6)
+                                : "No model calls",
+                            ],
+                          ].map(([k, v]) => (
+                            <div key={k}>
+                              <dt>{k}</dt>
+                              <dd>{v}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                        <p className="hint">
+                          Use the run ID to match the tool calls, approval, and
+                          repair receipt.
                         </p>
-                      )}
-                    </div>
-                  ) : (
-                    <>
-                      {!run ? (
-                        <div className="investigation-intro">
-                          <div className="intro-label">
-                            <span className="intro-icon">
-                              <Search size={20} />
-                            </span>
-                            <span>INVESTIGATION</span>
-                            <span className="intro-status">Ready</span>
+                      </>
+                    ) : (
+                      <p className="muted">
+                        Start an investigation to create an execution record.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    {!run ? (
+                      <div className="investigation-intro">
+                        <h3>No investigation yet</h3>
+                        <p>
+                          Check the account, recent events, and product
+                          documentation. An operator must approve any repair.
+                        </p>
+                        <button
+                          className="primary-button"
+                          onClick={() => void start()}
+                          disabled={pending}
+                        >
+                          {pending ? (
+                            <LoaderCircle size={16} className="spin" />
+                          ) : (
+                            <Search size={16} />
+                          )}
+                          Start investigation
+                          <ArrowRight size={16} />
+                        </button>
+                        <div className="provider-inline">
+                          <span>
+                            {provider === "deterministic"
+                              ? "Offline uses a fixed investigation script."
+                              : "An OpenRouter model chooses which tools to call."}
+                          </span>
+                          {session.live_available && (
+                            <button onClick={() => setModal("settings")}>
+                              Change mode
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div
+                          className="run-heading"
+                          role="status"
+                          aria-live="polite"
+                        >
+                          <div>
+                            <span className={"state-dot " + run.status} />
+                            <strong>
+                              {run.status === "running" &&
+                              run.phase === "execute"
+                                ? "Applying repair"
+                                : label(run.status)}
+                            </strong>
+                            {busy(run) && (
+                              <LoaderCircle size={14} className="spin" />
+                            )}
                           </div>
-                          <h3>Investigate this ticket.</h3>
-                          <p>
-                            Check the account and event history against the
-                            applicable procedure. Review the findings before
-                            making a change.
-                          </p>
-
+                          <div className="run-heading-right">
+                            <span className="provider-label">
+                              {run.provider === "deterministic"
+                                ? "Offline"
+                                : "Live"}
+                            </span>
+                            {busy(run) ? (
+                              <button
+                                className="text-button"
+                                onClick={() => void cancel()}
+                              >
+                                <Square size={11} />
+                                Cancel
+                              </button>
+                            ) : (
+                              <span className="mono">{short(run.id)}</span>
+                            )}
+                          </div>
+                        </div>
+                        {!connected && (
+                          <div className="connection-note">
+                            <Clock size={14} />
+                            Reconnecting to live updates. Saved results remain
+                            available.
+                          </div>
+                        )}
+                        {run.error && (
+                          <div className="result-card warning">
+                            <TriangleAlert size={20} />
+                            <div>
+                              <h3>Further review is needed</h3>
+                              <p>{run.error}</p>
+                            </div>
+                          </div>
+                        )}
+                        {run.result.summary && (
+                          <div
+                            className={
+                              "findings " +
+                              (run.result.verification?.verified
+                                ? "verified"
+                                : "")
+                            }
+                          >
+                            <div className="section-kicker">
+                              {run.result.verification?.verified ? (
+                                <>
+                                  <CheckCheck size={14} /> Outcome verified
+                                </>
+                              ) : (
+                                <>Findings</>
+                              )}
+                            </div>
+                            <h3>{run.result.summary}</h3>
+                            {run.result.facts?.length ? (
+                              <ul>
+                                {run.result.facts.map((fact, i) => (
+                                  <li key={i}>
+                                    <Check size={14} />
+                                    {fact.replace(
+                                      /\s*\(api:[0-9a-f-]+\)/gi,
+                                      "",
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : null}
+                            {run.result.assumptions?.length ? (
+                              <div className="missing-info">
+                                <strong>
+                                  {run.result.verification?.verified
+                                    ? "Assumptions recorded before the repair"
+                                    : "Not yet established"}
+                                </strong>
+                                {run.result.assumptions.map((item, i) => (
+                                  <p key={i}>{item}</p>
+                                ))}
+                              </div>
+                            ) : null}
+                            {run.result.missing_information?.length ? (
+                              <div className="missing-info">
+                                <strong>
+                                  {run.result.verification?.verified
+                                    ? "Information requested during investigation"
+                                    : "Still needed"}
+                                </strong>
+                                {run.result.missing_information.map((m, i) => (
+                                  <p key={i}>{m}</p>
+                                ))}
+                              </div>
+                            ) : null}
+                            {sources.length > 0 && (
+                              <div className="inline-sources">
+                                {sources.map((s) => (
+                                  <button
+                                    key={s.id}
+                                    onClick={() => void openSource(s)}
+                                  >
+                                    <BookOpen size={12} />
+                                    {s.title}
+                                    <span>v{s.version}</span>
+                                    <ArrowUpRight size={12} />
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {activeAction && (
+                          <div className={"action-card " + activeAction.status}>
+                            <div className="action-top">
+                              <span className="action-symbol">
+                                <Zap size={20} />
+                              </span>
+                              <div>
+                                <div className="section-kicker">
+                                  {activeAction.status === "pending"
+                                    ? "Proposed repair"
+                                    : "Repair record"}
+                                </div>
+                                <h3>
+                                  {activeAction.kind ===
+                                  "reprocess_billing_event"
+                                    ? "Reprocess the billing event"
+                                    : "Retry the failed delivery"}
+                                </h3>
+                              </div>
+                              <span className="action-state">
+                                {activeAction.status === "pending" ? (
+                                  <>
+                                    <Clock size={12} />
+                                    Approval needed
+                                  </>
+                                ) : (
+                                  label(activeAction.status)
+                                )}
+                              </span>
+                            </div>
+                            <p>{activeAction.payload.expected_effect}</p>
+                            <div className="action-object">
+                              <span>Exact event</span>
+                              <code>{activeAction.target_id}</code>
+                              <span>State version</span>
+                              <code>
+                                {activeAction.payload.expected_version}
+                              </code>
+                            </div>
+                            {activeAction.status === "pending" &&
+                              run.status === "waiting_for_approval" && (
+                                <>
+                                  <div className="action-safety">
+                                    <ShieldCheck size={14} />
+                                    The app checks permissions and account state
+                                    again before it runs the repair.
+                                  </div>
+                                  {session?.role === "operator" ? (
+                                    <div className="action-buttons">
+                                      <button
+                                        className="approve-button"
+                                        disabled={pending}
+                                        onClick={() =>
+                                          void decision(activeAction, "approve")
+                                        }
+                                      >
+                                        {pending ? (
+                                          <LoaderCircle
+                                            size={15}
+                                            className="spin"
+                                          />
+                                        ) : (
+                                          <Check size={16} />
+                                        )}
+                                        Approve & execute
+                                      </button>
+                                      <button
+                                        className="reject-button"
+                                        disabled={pending}
+                                        onClick={() =>
+                                          void decision(activeAction, "reject")
+                                        }
+                                      >
+                                        Decline
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="analyst-notice">
+                                      <LockKeyhole size={15} />
+                                      You can investigate. An operator must
+                                      approve this repair.
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            <details className="proposal-digest">
+                              <summary>
+                                Proposal checksum <ChevronDown size={12} />
+                              </summary>
+                              <code>{activeAction.digest}</code>
+                            </details>
+                          </div>
+                        )}
+                        {run.result.reply !== undefined && !busy(run) && (
+                          <div className="reply-card">
+                            <div className="reply-heading">
+                              <h3>
+                                <MessageSquare size={17} />
+                                Customer reply
+                              </h3>
+                              <span>
+                                {saved
+                                  ? "Saved"
+                                  : draftDirty.current
+                                    ? "Unsaved changes"
+                                    : "Draft"}
+                              </span>
+                            </div>
+                            <textarea
+                              aria-label="Customer reply draft"
+                              value={draft}
+                              onChange={(e) => {
+                                setDraft(e.target.value);
+                                try {
+                                  sessionStorage.setItem(
+                                    "saipport:draft:" + run.id,
+                                    e.target.value,
+                                  );
+                                } catch {
+                                  /* Optional storage. */
+                                }
+                                draftRevision.current++;
+                                draftDirty.current = true;
+                                setSaved(false);
+                              }}
+                            />
+                            <div className="reply-footer">
+                              <span>
+                                <LockKeyhole size={12} />
+                                This app does not send replies.
+                              </span>
+                              <button
+                                className="text-button"
+                                onClick={() => {
+                                  void navigator.clipboard
+                                    .writeText(draft)
+                                    .then(() => {
+                                      setCopied(true);
+                                      setTimeout(() => setCopied(false), 2000);
+                                    })
+                                    .catch(() =>
+                                      setError(
+                                        "Clipboard access failed. Select the reply text and copy it manually.",
+                                      ),
+                                    );
+                                }}
+                              >
+                                {copied ? (
+                                  <Check size={13} />
+                                ) : (
+                                  <Copy size={13} />
+                                )}{" "}
+                                {copied ? "Copied" : "Copy"}
+                              </button>
+                              <button
+                                className="outline-button"
+                                onClick={() => void save()}
+                              >
+                                {saved ? <Check size={13} /> : null}
+                                {saved ? "Saved" : "Save draft"}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        <details
+                          className="activity-timeline"
+                          open={!run.result.summary || busy(run)}
+                        >
+                          <summary>
+                            <Activity size={15} />
+                            <strong>Investigation activity</strong>
+                            <span>{tools.length} tool calls</span>
+                            <ChevronDown size={14} />
+                          </summary>
+                          <div className="timeline">
+                            {run.events
+                              .filter((e) => !["check"].includes(e.kind))
+                              .map((e) => (
+                                <TimelineEvent key={e.id} event={e} />
+                              ))}
+                            {busy(run) && (
+                              <div className="timeline-pending">
+                                <span className="pulse-dot" />
+                                Waiting for the next update…
+                              </div>
+                            )}
+                          </div>
+                        </details>
+                        {[
+                          "completed",
+                          "needs_human",
+                          "failed",
+                          "cancelled",
+                        ].includes(run.status) && (
                           <button
-                            className="primary-button"
+                            className="text-button rerun"
                             onClick={() => void start()}
                             disabled={pending}
                           >
-                            {pending ? (
-                              <LoaderCircle size={16} className="spin" />
-                            ) : (
-                              <Sparkles size={16} />
-                            )}
-                            Start investigation
-                            <ArrowRight size={16} />
+                            <ArrowRight size={14} />
+                            Run another investigation
                           </button>
-                          <div className="provider-inline">
-                            <span className="provider-dot" />
-                            {provider === "deterministic"
-                              ? "Offline · deterministic tool driver"
-                              : "Live · OpenRouter free model"}
-                            <button onClick={() => setModal("settings")}>
-                              Change
-                            </button>
-                          </div>
-                          <ol className="investigation-checklist">
-                            <li>
-                              <span>01</span>
-                              <div>
-                                <strong>Inspect the account</strong>
-                                <p>Read current state and recent events.</p>
-                              </div>
-                              <CreditCard size={17} />
-                            </li>
-                            <li>
-                              <span>02</span>
-                              <div>
-                                <strong>Find supporting evidence</strong>
-                                <p>Match the product version and procedure.</p>
-                              </div>
-                              <BookOpen size={17} />
-                            </li>
-                            <li>
-                              <span>03</span>
-                              <div>
-                                <strong>Review the next step</strong>
-                                <p>Approve a specific repair or escalate.</p>
-                              </div>
-                              <ShieldCheck size={17} />
-                            </li>
-                          </ol>
-                        </div>
-                      ) : (
-                        <>
-                          <div
-                            className="run-heading"
-                            role="status"
-                            aria-live="polite"
-                          >
-                            <div>
-                              <span className={"state-dot " + run.status} />
-                              <strong>
-                                {run.status === "running" &&
-                                run.phase === "execute"
-                                  ? "Applying repair"
-                                  : label(run.status)}
-                              </strong>
-                              {busy(run) && (
-                                <LoaderCircle size={14} className="spin" />
-                              )}
-                            </div>
-                            <div className="run-heading-right">
-                              <span className="provider-label">
-                                {run.provider === "deterministic"
-                                  ? "OFFLINE"
-                                  : "LIVE MODEL"}
-                              </span>
-                              {busy(run) ? (
-                                <button
-                                  className="text-button"
-                                  onClick={() => void cancel()}
-                                >
-                                  <Square size={11} />
-                                  Cancel
-                                </button>
-                              ) : (
-                                <span className="mono">{short(run.id)}</span>
-                              )}
-                            </div>
-                          </div>
-                          {!connected && (
-                            <div className="connection-note">
-                              <Clock size={14} />
-                              Reconnecting to live updates. Saved results remain
-                              available.
-                            </div>
-                          )}
-                          {run.error && (
-                            <div className="result-card warning">
-                              <TriangleAlert size={20} />
-                              <div>
-                                <h3>Further review is needed</h3>
-                                <p>{run.error}</p>
-                              </div>
-                            </div>
-                          )}
-                          {run.result.summary && (
-                            <div
-                              className={
-                                "findings " +
-                                (run.result.verification?.verified
-                                  ? "verified"
-                                  : "")
-                              }
-                            >
-                              <div className="section-kicker">
-                                {run.result.verification?.verified ? (
-                                  <>
-                                    <CheckCheck size={14} /> OUTCOME VERIFIED
-                                  </>
-                                ) : (
-                                  <>INVESTIGATION FINDINGS</>
-                                )}
-                              </div>
-                              <h3>{run.result.summary}</h3>
-                              {run.result.facts?.length ? (
-                                <ul>
-                                  {run.result.facts.map((fact, i) => (
-                                    <li key={i}>
-                                      <Check size={14} />
-                                      {fact.replace(
-                                        /\s*\(api:[0-9a-f-]+\)/gi,
-                                        "",
-                                      )}
-                                    </li>
-                                  ))}
-                                </ul>
-                              ) : null}
-                              {run.result.assumptions?.length ? (
-                                <div className="missing-info">
-                                  <strong>
-                                    {run.result.verification?.verified
-                                      ? "Assumptions recorded before the repair"
-                                      : "Not yet established"}
-                                  </strong>
-                                  {run.result.assumptions.map((item, i) => (
-                                    <p key={i}>{item}</p>
-                                  ))}
-                                </div>
-                              ) : null}
-                              {run.result.missing_information?.length ? (
-                                <div className="missing-info">
-                                  <strong>
-                                    {run.result.verification?.verified
-                                      ? "Information requested during investigation"
-                                      : "Still needed"}
-                                  </strong>
-                                  {run.result.missing_information.map(
-                                    (m, i) => (
-                                      <p key={i}>{m}</p>
-                                    ),
-                                  )}
-                                </div>
-                              ) : null}
-                              {sources.length > 0 && (
-                                <div className="inline-sources">
-                                  {sources.map((s) => (
-                                    <button
-                                      key={s.id}
-                                      onClick={() => void openSource(s)}
-                                    >
-                                      <BookOpen size={12} />
-                                      {s.title}
-                                      <span>v{s.version}</span>
-                                      <ArrowUpRight size={12} />
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          {activeAction && (
-                            <div
-                              className={"action-card " + activeAction.status}
-                            >
-                              <div className="action-top">
-                                <span className="action-symbol">
-                                  <Zap size={20} />
-                                </span>
-                                <div>
-                                  <div className="section-kicker">
-                                    {activeAction.status === "pending"
-                                      ? "YOUR DECISION"
-                                      : "REPAIR RECORD"}
-                                  </div>
-                                  <h3>
-                                    {activeAction.kind ===
-                                    "reprocess_billing_event"
-                                      ? "Reprocess the billing event"
-                                      : "Retry the failed delivery"}
-                                  </h3>
-                                </div>
-                                <span className="action-state">
-                                  {activeAction.status === "pending" ? (
-                                    <>
-                                      <Clock size={12} />
-                                      Approval needed
-                                    </>
-                                  ) : (
-                                    label(activeAction.status)
-                                  )}
-                                </span>
-                              </div>
-                              <p>{activeAction.payload.expected_effect}</p>
-                              <div className="action-object">
-                                <span>Exact event</span>
-                                <code>{activeAction.target_id}</code>
-                                <span>State version</span>
-                                <code>
-                                  {activeAction.payload.expected_version}
-                                </code>
-                              </div>
-                              {activeAction.status === "pending" &&
-                                run.status === "waiting_for_approval" && (
-                                  <>
-                                    <div className="action-safety">
-                                      <ShieldCheck size={14} />
-                                      Permissions and current state are checked
-                                      again before execution.
-                                    </div>
-                                    {session?.role === "operator" ? (
-                                      <div className="action-buttons">
-                                        <button
-                                          className="approve-button"
-                                          disabled={pending}
-                                          onClick={() =>
-                                            void decision(
-                                              activeAction,
-                                              "approve",
-                                            )
-                                          }
-                                        >
-                                          {pending ? (
-                                            <LoaderCircle
-                                              size={15}
-                                              className="spin"
-                                            />
-                                          ) : (
-                                            <Check size={16} />
-                                          )}
-                                          Approve & execute
-                                        </button>
-                                        <button
-                                          className="reject-button"
-                                          disabled={pending}
-                                          onClick={() =>
-                                            void decision(
-                                              activeAction,
-                                              "reject",
-                                            )
-                                          }
-                                        >
-                                          Decline
-                                        </button>
-                                      </div>
-                                    ) : (
-                                      <div className="analyst-notice">
-                                        <LockKeyhole size={15} />
-                                        You can investigate. An operator must
-                                        approve this repair.
-                                      </div>
-                                    )}
-                                  </>
-                                )}
-                              <details className="proposal-digest">
-                                <summary>
-                                  Proposal integrity <ChevronDown size={12} />
-                                </summary>
-                                <code>{activeAction.digest}</code>
-                              </details>
-                            </div>
-                          )}
-                          {run.result.reply !== undefined && !busy(run) && (
-                            <div className="reply-card">
-                              <div className="reply-heading">
-                                <h3>
-                                  <MessageSquare size={17} />
-                                  Customer reply
-                                </h3>
-                                <span>
-                                  {saved
-                                    ? "Saved"
-                                    : draftDirty.current
-                                      ? "Unsaved changes"
-                                      : "Draft · not sent"}
-                                </span>
-                              </div>
-                              <textarea
-                                aria-label="Customer reply draft"
-                                value={draft}
-                                onChange={(e) => {
-                                  setDraft(e.target.value);
-                                  try {
-                                    sessionStorage.setItem(
-                                      "saipport:draft:" + run.id,
-                                      e.target.value,
-                                    );
-                                  } catch {
-                                    /* Optional storage. */
-                                  }
-                                  draftRevision.current++;
-                                  draftDirty.current = true;
-                                  setSaved(false);
-                                }}
-                              />
-                              <div className="reply-footer">
-                                <span>
-                                  <LockKeyhole size={12} />
-                                  You review. You send.
-                                </span>
-                                <button
-                                  className="text-button"
-                                  onClick={() => {
-                                    void navigator.clipboard
-                                      .writeText(draft)
-                                      .then(() => {
-                                        setCopied(true);
-                                        setTimeout(
-                                          () => setCopied(false),
-                                          2000,
-                                        );
-                                      })
-                                      .catch(() =>
-                                        setError(
-                                          "Clipboard access failed. Select the reply text and copy it manually.",
-                                        ),
-                                      );
-                                  }}
-                                >
-                                  {copied ? (
-                                    <Check size={13} />
-                                  ) : (
-                                    <Copy size={13} />
-                                  )}{" "}
-                                  {copied ? "Copied" : "Copy"}
-                                </button>
-                                <button
-                                  className="outline-button"
-                                  onClick={() => void save()}
-                                >
-                                  {saved ? <Check size={13} /> : null}
-                                  {saved ? "Saved" : "Save draft"}
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                          <details
-                            className="activity-timeline"
-                            open={!run.result.summary || busy(run)}
-                          >
-                            <summary>
-                              <Activity size={15} />
-                              <strong>Investigation activity</strong>
-                              <span>{tools.length} tool calls</span>
-                              <ChevronDown size={14} />
-                            </summary>
-                            <div className="timeline">
-                              {run.events
-                                .filter((e) => !["check"].includes(e.kind))
-                                .map((e) => (
-                                  <TimelineEvent key={e.id} event={e} />
-                                ))}
-                              {busy(run) && (
-                                <div className="timeline-pending">
-                                  <span className="pulse-dot" />
-                                  Checking the next piece of evidence…
-                                </div>
-                              )}
-                            </div>
-                          </details>
-                          {[
-                            "completed",
-                            "needs_human",
-                            "failed",
-                            "cancelled",
-                          ].includes(run.status) && (
-                            <button
-                              className="text-button rerun"
-                              onClick={() => void start()}
-                              disabled={pending}
-                            >
-                              <ArrowRight size={14} />
-                              Run another investigation
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </>
-                  )}
-                </div>
-                <div className="case-foot">
-                  <ShieldCheck size={13} />
-                  <span>Evidence first. Human-approved actions.</span>
-                  <span className="case-foot-status">
-                    <span />
-                    {connected ? "Workspace connected" : "Reconnecting"}
-                  </span>
-                </div>
-              </>
-            )}
-          </section>
-          <AccountContext
-            account={detail?.account}
-            customer={t?.customer}
-            open={contextOpen}
-            onClose={() => setContextOpen(false)}
-            onInspect={() => {
-              setTab("details");
-              setContextOpen(false);
-            }}
-          />
-        </main>
-      </div>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+            </>
+          )}
+        </section>
+        <AccountContext
+          account={detail?.account}
+          customer={t?.customer}
+          open={contextOpen}
+          onClose={() => setContextOpen(false)}
+          onInspect={() => {
+            setTab("details");
+            setContextOpen(false);
+          }}
+        />
+      </main>
       {(modal || source) && (
         <Dialog
           title={
@@ -1396,7 +1231,6 @@ export default function App() {
           )}
           {source ? (
             <>
-              <div className="section-kicker">VERSIONED SOURCE</div>
               <h2>{source.title}</h2>
               <div className="source-meta">
                 Version {source.version} · Product {source.product_version} ·{" "}
@@ -1407,12 +1241,8 @@ export default function App() {
             </>
           ) : modal === "settings" ? (
             <>
-              <div className="section-kicker">WORKSPACE SETTINGS</div>
               <h2>Workspace settings</h2>
-              <p className="muted">
-                The provider is recorded on each run. Changing it affects new
-                investigations.
-              </p>
+              <p className="muted">Changes apply to new investigations.</p>
               <label className="setting-label">
                 Investigation provider
                 <select
@@ -1428,14 +1258,12 @@ export default function App() {
                     }
                   }}
                 >
-                  <option value="deterministic">
-                    Offline · deterministic tool driver
-                  </option>
+                  <option value="deterministic">Offline</option>
                   <option
                     value="openrouter"
                     disabled={!session?.live_available}
                   >
-                    Live · OpenRouter free model
+                    Live via OpenRouter
                     {!session?.live_available
                       ? session?.live_unavailable_reason
                         ? " (unavailable)"
@@ -1445,9 +1273,9 @@ export default function App() {
                 </select>
               </label>
               <p className="hint">
-                Offline mode exercises the real APIs and workflow with a
-                deterministic driver. Live mode asks a free model to choose and
-                call tools. Neither mode can approve its own repair.
+                Offline follows a fixed script. In Live mode, a free model
+                chooses the tools. Both modes use the same tools and require
+                operator approval.
               </p>
               {session?.live_unavailable_reason && !session.live_available && (
                 <p className="provider-unavailable" role="status">
@@ -1486,7 +1314,6 @@ export default function App() {
             </>
           ) : modal === "activity" ? (
             <>
-              <div className="section-kicker">OBSERVABLE OPERATIONS</div>
               <h2>Workspace activity</h2>
               {metrics ? (
                 <>
@@ -1574,11 +1401,10 @@ export default function App() {
             </>
           ) : (
             <>
-              <div className="section-kicker">DEMO GUIDE</div>
               <h2>Try your first investigation</h2>
               <p className="muted">
-                Every account here is synthetic. The tools, approvals, stored
-                state, and verification are real.
+                The demo uses fictional accounts. You can approve repairs and
+                see the changes on those accounts.
               </p>
               <ol className="guide-steps">
                 <li>
@@ -1586,8 +1412,8 @@ export default function App() {
                   <div>
                     <strong>Investigate a ticket</strong>
                     <p>
-                      Start with “Paid for Pro, still on Free.” Inspect the API
-                      facts and the applicable procedure.
+                      Start with "Paid for Pro, still on Free." Read the account
+                      data and the procedure the app found.
                     </p>
                   </div>
                 </li>
@@ -1613,10 +1439,8 @@ export default function App() {
                 </li>
               </ol>
               <p className="hint">
-                Also try the failed integration and product setup questions.
-                Switch to an analyst workspace to check approval restrictions.
-                Live model access depends on the configured OpenRouter key and
-                free-provider availability.
+                An analyst can investigate but cannot approve a repair. Switch
+                roles in Settings to try it.
               </p>
               <button className="primary-button" onClick={() => setModal(null)}>
                 Open the workspace
