@@ -61,9 +61,20 @@ function localDraft(run: Run) {
   }
 }
 async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const deadline = AbortSignal.timeout(15000);
   const r = await fetch("/api" + path, {
     ...options,
+    signal: options.signal
+      ? AbortSignal.any([options.signal, deadline])
+      : deadline,
     headers: { "Content-Type": "application/json", ...options.headers },
+  }).catch((error) => {
+    if (deadline.aborted)
+      throw new ApiError(
+        "The server took too long to respond. Try again.",
+        504,
+      );
+    throw error;
   });
   if (!r.ok) {
     const d = await r.json().catch(() => ({
@@ -82,6 +93,8 @@ async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   return r.json();
 }
 const busy = (r: Run | null) => !!r && ["queued", "running"].includes(r.status);
+const selectedRunFinished = (r: Run) =>
+  ["completed", "needs_human", "failed", "cancelled"].includes(r.status);
 const label = (v: string) =>
   ({
     waiting_for_approval: "Awaiting approval",
@@ -128,6 +141,8 @@ export default function App() {
     ),
     [query, setQuery] = useState(""),
     [filter, setFilter] = useState("all");
+  const [ticketError, setTicketError] = useState("");
+  const [ticketAttempt, setTicketAttempt] = useState(0);
   const [error, setError] = useState(""),
     [loading, setLoading] = useState(true),
     [pending, setPending] = useState(false),
@@ -148,7 +163,10 @@ export default function App() {
     draftRevision = useRef(0),
     selectedRef = useRef(selected),
     draftRef = useRef(draft),
-    casePanel = useRef<HTMLElement>(null);
+    casePanel = useRef<HTMLElement>(null),
+    queueSearch = useRef<HTMLInputElement>(null);
+  const runRef = useRef(run);
+  runRef.current = run;
   draftRef.current = draft;
   selectedRef.current = selected;
   const loadQueue = useCallback(async () => {
@@ -160,16 +178,19 @@ export default function App() {
     async (role?: string) => {
       setLoading(true);
       setError("");
-      setSelected("");
-      selectedRef.current = "";
-      setRun(null);
-      setDetail(null);
       try {
-        if (role)
+        if (role) {
           await api("/demo/session", {
             method: "POST",
             body: JSON.stringify({ role }),
           });
+          setTickets([]);
+          setSelected("");
+          selectedRef.current = "";
+          setRun(null);
+          setDetail(null);
+          setTicketError("");
+        }
         let s: Session;
         try {
           s = await api<Session>("/session");
@@ -195,7 +216,10 @@ export default function App() {
         setProvider(choice);
         const ts = await loadQueue();
         setSelected(ts[0]?.id || "");
-        setRun(null);
+        setTicketAttempt((attempt) => attempt + 1);
+        setQuery("");
+        setFilter("all");
+        setMobileQueue(false);
         setModal(null);
       } catch (e) {
         setError((e as Error).message);
@@ -214,6 +238,7 @@ export default function App() {
   useEffect(() => {
     if (!selected) return;
     let active = true;
+    const request = new AbortController();
     casePanel.current?.scrollTo(0, 0);
     setDetail(null);
     setRun(null);
@@ -221,33 +246,54 @@ export default function App() {
     setSaved(false);
     setCopied(false);
     setContextOpen(false);
+    setTicketError("");
     setError("");
     setDraft("");
     draftDirty.current = false;
-    api<NonNullable<typeof detail>>("/tickets/" + selected)
-      .then(async (d) => {
+    const signal = request.signal;
+    async function loadTicket() {
+      try {
+        const d = await api<NonNullable<typeof detail>>(
+          "/tickets/" + selected,
+          { signal },
+        );
+        const r = d.run_id
+          ? await api<Run>("/runs/" + d.run_id, { signal })
+          : null;
         if (!active) return;
         setDetail(d);
-        if (d.run_id) {
-          const r = await api<Run>("/runs/" + d.run_id);
-          if (active) {
-            setRun(r);
-            setDraft(localDraft(r));
-            draftDirty.current = localDraft(r) !== (r.result.reply || "");
-          }
+        setRun(r);
+        if (r) {
+          const reply = localDraft(r);
+          setDraft(reply);
+          draftDirty.current = reply !== (r.result.reply || "");
         }
-      })
-      .catch((e) => active && setError(e.message));
+      } catch (e) {
+        if (active)
+          setTicketError(
+            e instanceof ApiError && e.status === 401
+              ? "Your demo session expired. Reload to get a new workspace."
+              : (e as Error).message,
+          );
+      }
+    }
+    void loadTicket();
     return () => {
       active = false;
+      request.abort();
     };
-  }, [selected]);
+  }, [selected, ticketAttempt]);
+  useEffect(() => {
+    if (mobileQueue && queueSearch.current?.getClientRects().length)
+      queueSearch.current.focus({ preventScroll: true });
+  }, [mobileQueue]);
   const runId = run?.id;
   useEffect(() => {
     if (!runId) return;
     let active = true;
     const tid = selectedRef.current;
     let refreshing = false;
+    let syncedStatus: string | undefined;
     const refresh = async () => {
       if (refreshing || !active) return;
       refreshing = true;
@@ -257,18 +303,20 @@ export default function App() {
         if (!active) return;
         setRun(r);
         setConnected(true);
-        if (!["queued", "running"].includes(r.status)) {
-          await loadQueue();
-          const d = await api<NonNullable<typeof detail>>("/tickets/" + tid);
+        if (!busy(r) && syncedStatus !== r.status) {
+          const [ts, d] = await Promise.all([
+            api<Ticket[]>("/tickets"),
+            api<NonNullable<typeof detail>>("/tickets/" + tid),
+          ]);
           if (active) {
+            setTickets(ts);
             setDetail(d);
+            syncedStatus = r.status;
             if (!draftDirty.current && draftRevision.current === revision)
               setDraft(r.result.reply || "");
           }
         }
-        if (
-          ["completed", "needs_human", "failed", "cancelled"].includes(r.status)
-        ) {
+        if (selectedRunFinished(r)) {
           clearInterval(timer);
           es.close();
         }
@@ -301,15 +349,12 @@ export default function App() {
       clearInterval(timer);
       es.close();
     };
-  }, [runId, loadQueue]);
+  }, [runId]);
   async function start() {
     if (!detail) return;
     const ticketId = detail.ticket.id;
-    setRun(null);
     setPending(true);
     setError("");
-    setDraft("");
-    draftDirty.current = false;
     try {
       const r = await api<{ id: string }>("/tickets/" + ticketId + "/runs", {
         method: "POST",
@@ -317,8 +362,12 @@ export default function App() {
       });
       const fresh = await api<Run>("/runs/" + r.id);
       if (selectedRef.current === ticketId) {
+        const reply = localDraft(fresh);
         setRun(fresh);
+        setDraft(reply);
         setSaved(false);
+        setCopied(false);
+        draftDirty.current = reply !== (fresh.result.reply || "");
       }
       await loadQueue();
     } catch (e) {
@@ -379,7 +428,11 @@ export default function App() {
         method: "PATCH",
         body: JSON.stringify({ reply: draft }),
       });
-      if (selectedRef.current === ticketId && draftRef.current === text) {
+      if (
+        selectedRef.current === ticketId &&
+        runRef.current?.id === runId &&
+        draftRef.current === text
+      ) {
         setSaved(true);
         draftRevision.current++;
         draftDirty.current = false;
@@ -646,19 +699,27 @@ export default function App() {
           )}
           {!detail ? (
             <div className="panel-loading">
-              <LoaderCircle className="spin" />
-              <p>
-                {error
-                  ? "The workspace could not be loaded."
-                  : "Loading ticket…"}
-              </p>
-              {error && (
-                <button
-                  className="primary-button"
-                  onClick={() => void bootstrap()}
-                >
-                  Retry
-                </button>
+              {ticketError ? (
+                <>
+                  <p role="alert">{ticketError}</p>
+                  <button
+                    className="primary-button"
+                    onClick={() => setTicketAttempt((n) => n + 1)}
+                  >
+                    Retry ticket
+                  </button>
+                  <button
+                    className="text-button"
+                    onClick={() => void bootstrap()}
+                  >
+                    Reload workspace
+                  </button>
+                </>
+              ) : (
+                <>
+                  <LoaderCircle className="spin" />
+                  <p role="status">Loading ticket…</p>
+                </>
               )}
             </div>
           ) : (

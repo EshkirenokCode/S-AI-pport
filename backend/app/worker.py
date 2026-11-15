@@ -84,13 +84,13 @@ class Worker:
                 )
             ).fetchone()
 
-    async def check(self, run):
+    async def check(self, run, *, reconciling=False):
         fresh = await self.db.one(
             "SELECT * FROM runs WHERE id=%s AND tenant_id=%s", (run["id"], run["tenant_id"])
         )
-        if fresh["lease_owner"] != self.owner or fresh["status"] != "running":
+        if not fresh or fresh["lease_owner"] != self.owner or fresh["status"] != "running":
             raise InterruptedRun("Worker lease is no longer active")
-        if fresh["cancel_requested"]:
+        if fresh["cancel_requested"] and not reconciling:
             raise InterruptedRun("Investigation was cancelled")
         if datetime.now(UTC) > fresh["deadline"]:
             raise PolicyError("Run time budget exhausted")
@@ -105,17 +105,47 @@ class Worker:
                 (self.cfg.lease_seconds, run["id"], self.owner),
             )
 
-    async def finish(self, run, status, error=None):
+    async def finish(self, run, status, error=None, *, repair=None):
         async with self.db.pool.connection() as c, c.transaction():
             current = await (
                 await c.execute(
-                    "SELECT id,result FROM runs WHERE id=%s AND lease_owner=%s AND status='running' FOR UPDATE",
+                    "SELECT id,result,cancel_requested FROM runs WHERE id=%s AND lease_owner=%s AND status='running' FOR UPDATE",
                     (run["id"], self.owner),
                 )
             ).fetchone()
             if not current:
                 return
-            if status in ("needs_human", "failed", "cancelled"):
+            if repair:
+                action, receipt, result = repair
+                verification = result["verification"]
+                verified = verification["verified"]
+                verification["cancel_requested"] = current["cancel_requested"]
+                await c.execute(
+                    "UPDATE actions SET status=%s,receipt=%s WHERE id=%s",
+                    ("succeeded" if verified else "failed", js(receipt), action["id"]),
+                )
+                await c.execute("UPDATE runs SET result=%s WHERE id=%s", (js(result), run["id"]))
+                await c.execute(
+                    "INSERT INTO events(tenant_id,run_id,kind,title,data) VALUES(%s,%s,%s,%s,%s)",
+                    (
+                        run["tenant_id"],
+                        run["id"],
+                        "verified" if verified else "verification_failed",
+                        "Repair verified" if verified else "Expected effect was not verified",
+                        js(verification),
+                    ),
+                )
+                await c.execute(
+                    "INSERT INTO audit(tenant_id,actor_id,verb,object_id,trace_id) VALUES(%s,%s,%s,%s,%s)",
+                    (
+                        run["tenant_id"],
+                        action["approved_by"],
+                        "action.verified" if verified else "action.verification_failed",
+                        str(action["id"]),
+                        run["id"],
+                    ),
+                )
+            elif status in ("needs_human", "failed", "cancelled"):
                 if current["result"].get("disposition") == "propose_action":
                     result = {
                         **current["result"],
@@ -316,33 +346,30 @@ class Worker:
             run, "verification", "Reading the account again to verify the effect", {"receipt": receipt}
         )
         state = await self.lab.state(run["tenant_id"], action["payload"]["account_id"])
-        verified = (
-            (state["plan"] == "Pro" and state["billing"]["event"]["status"] == "processed")
-            if action["kind"] == "reprocess_billing_event"
-            else (
-                state["delivery"]["event"]["status"] == "delivered"
-                and state["delivery"]["event"].get("acknowledged") is True
+        billing = action["kind"] == "reprocess_billing_event"
+        event = state["billing" if billing else "delivery"].get("event")
+        verified = bool(
+            event
+            and event["id"] == action["target_id"]
+            and (
+                (state["plan"] == "Pro" and event["status"] == "processed")
+                if billing
+                else (event["status"] == "delivered" and event.get("acknowledged") is True)
             )
         )
-        await self.db.execute(
-            "UPDATE actions SET status=%s,receipt=%s WHERE id=%s",
-            ("succeeded" if verified else "failed", js(receipt), action["id"]),
-        )
-        row = await self.db.one("SELECT result,cancel_requested FROM runs WHERE id=%s", (run["id"],))
+        row = await self.db.one("SELECT result FROM runs WHERE id=%s", (run["id"],))
         result = row["result"]
         result["verification"] = {
             "verified": verified,
             "account_version": state["version"],
             "plan": state["plan"],
             "operation_id": str(action["id"]),
-            "cancel_requested": row["cancel_requested"],
         }
         result["disposition"] = "resolved" if verified else "needs_human"
         if verified:
             result["facts"] = ["Before repair: " + fact for fact in result.get("facts", [])]
-            result["facts"].append(
-                f"Post-action check: plan {state['plan']}, account version {state['version']}; expected effect verified."
-            )
+            effect = f"plan {state['plan']}" if billing else f"event {event['id']} acknowledged"
+            result["facts"].append(f"After repair: {effect}. Account version {state['version']}.")
             result["summary"] = (
                 "The paid Pro access is restored. The account was read again and the billing event is processed."
                 if action["kind"] == "reprocess_billing_event"
@@ -360,28 +387,15 @@ class Worker:
             result["reply"] = (
                 "The recovery operation completed, but I could not verify that it restored the expected state. I have escalated this for further investigation."
             )
-        await self.db.execute(
-            "UPDATE runs SET result=%s WHERE id=%s AND lease_owner=%s", (js(result), run["id"], self.owner)
+        await self.finish(
+            run, "completed" if verified else "needs_human", repair=(action, receipt, result)
         )
-        await self.db.event(
-            run,
-            "verified" if verified else "verification_failed",
-            "Repair verified" if verified else "Expected effect was not verified",
-            result["verification"],
-        )
-        await self.db.audit(
-            run["tenant_id"],
-            action["approved_by"],
-            "action.verified" if verified else "action.verification_failed",
-            action["id"],
-            run["id"],
-        )
-        await self.finish(run, "completed" if verified else "needs_human")
 
     async def process(self, run):
         heartbeat = asyncio.create_task(self.heartbeat(run))
         try:
-            await self.check(run)
+            # A recovered execution must check for an existing receipt even after cancellation.
+            await self.check(run, reconciling=run["phase"] == "execute")
             await self.db.event(
                 run,
                 "state",

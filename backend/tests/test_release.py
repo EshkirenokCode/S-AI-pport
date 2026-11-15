@@ -1,4 +1,6 @@
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 from uuid import uuid4
 
 import jwt
@@ -91,6 +93,11 @@ def test_expired_synthetic_workspace_retention(client, stack):
     tenant = actor["tenant_id"]
     with psycopg.connect(stack.env["DATABASE_URL"], autocommit=True) as c:
         c.execute("UPDATE sessions SET expires_at=now()-interval '1 second' WHERE tenant_id=%s", (tenant,))
+        # Put the test workspace first even when a reused test DB contains an expired backlog.
+        c.execute(
+            "UPDATE tenants SET created_at=(SELECT min(created_at) FROM tenants)-interval '1 day' WHERE id=%s",
+            (tenant,),
+        )
 
     async def clean_expired():
         # Maintenance uses the test services, never the local development tenant.
@@ -139,3 +146,62 @@ def test_mcp_wrapped_provider_errors_preserve_actionable_outcome():
         "needs_human",
         "Model call budget exhausted",
     )
+
+
+
+def test_concurrent_starts_share_one_run(client, stack):
+    ticket = client.get("/api/tickets").raise_for_status().json()[0]
+    path = "/api/tickets/" + ticket["id"] + "/runs"
+    start = Barrier(4)
+    stack.stop_worker()
+    try:
+        def request():
+            start.wait(timeout=5)
+            return client.post(path, json={}).raise_for_status().json()["id"]
+
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            futures = [executor.submit(request) for _ in range(4)]
+            ids = {f.result(timeout=10) for f in futures}
+        assert len(ids) == 1
+        client.post("/api/runs/" + ids.pop() + "/cancel").raise_for_status()
+    finally:
+        stack.start_worker()
+
+
+def test_approval_respects_workspace_capacity_and_can_be_retried(client, stack):
+    _, pending = investigate(client, "billing_recoverable")
+    action = pending["actions"][0]
+    decision = "/api/actions/" + action["id"] + "/decision"
+    body = {"decision": "approve", "digest": action["digest"]}
+    queued = []
+    stack.stop_worker()
+    try:
+        tickets = client.get("/api/tickets").raise_for_status().json()
+        for ticket in tickets[1:4]:
+            queued.append(client.post("/api/tickets/" + ticket["id"] + "/runs", json={}).raise_for_status().json()["id"])
+        assert client.post(decision, json=body).status_code == 429
+        run = client.get("/api/runs/" + pending["id"]).raise_for_status().json()
+        assert run["status"] == "waiting_for_approval"
+        assert run["actions"][0]["status"] == "pending"
+        assert not any(e["kind"] == "approval" for e in run["events"])
+    finally:
+        for run_id in queued:
+            client.post("/api/runs/" + run_id + "/cancel").raise_for_status()
+        stack.start_worker()
+    run = approve(client, pending)
+    assert run["result"]["verification"]["verified"]
+    assert sum(e["kind"] == "approval" for e in run["events"]) == 1
+
+
+def test_investigating_a_repaired_delivery_does_not_reopen_it(client):
+    ticket, first = investigate(client, "delivery_transient")
+    verified = approve(client, first)
+    assert verified["result"]["verification"]["verified"] is True
+    _, second = investigate(client, "delivery_transient")
+    assert second["id"] != first["id"]
+    assert second["status"] == "completed"
+    assert second["actions"] == []
+    assert "already acknowledged" in second["result"]["summary"]
+    detail = client.get("/api/tickets/" + ticket["id"]).raise_for_status().json()
+    assert detail["ticket"]["status"] == "resolved"
+    assert detail["account"]["version"] == 2

@@ -180,8 +180,10 @@ class ToolRegistry:
                     and state["billing"]["event"]["status"] == "processed"
                 ):
                     raise PolicyError("Current API state does not establish a resolved billing issue")
-                if ticket["family"] == "integration" and state["delivery"]["event"]["status"] != "delivered":
-                    raise PolicyError("Delivery is not confirmed; do not claim resolution")
+                if ticket["family"] == "integration":
+                    event = state["delivery"].get("event")
+                    if not event or event["status"] != "delivered" or event.get("acknowledged") is not True:
+                        raise PolicyError("Delivery is not confirmed; do not claim resolution")
                 if ticket["family"] == "configuration" and not any(
                     e["data"]["tool"] == "read_document" for e in events
                 ):

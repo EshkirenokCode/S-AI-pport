@@ -179,3 +179,53 @@ test("unavailable live access explains the deployment restriction", async ({
   await provider.press("Enter");
   await expect(provider).toHaveValue("deterministic");
 });
+
+test("failed ticket load can be retried without replacing the workspace", async ({
+  page,
+}) => {
+  const ticketRoute = /\/api\/tickets\/[0-9a-f-]+$/;
+  await page.route(ticketRoute, (route) =>
+    route.fulfill({
+      status: 503,
+      json: { detail: "Ticket service unavailable" },
+    }),
+  );
+  await page
+    .getByRole("button")
+    .filter({ hasText: "Webhook deliveries have stopped" })
+    .click();
+  await expect(page.getByRole("alert")).toHaveText(
+    "Ticket service unavailable",
+  );
+  await page.unroute(ticketRoute);
+  await page.getByRole("button", { name: "Retry ticket" }).click();
+  await expect(page.locator("#ticket-workspace h2")).toHaveText(
+    "Webhook deliveries have stopped",
+  );
+  await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
+test("a failed rerun keeps verified findings and the current draft", async ({
+  page,
+}) => {
+  await page
+    .getByRole("button", { name: "Start investigation", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Approve & execute", exact: true })
+    .click();
+  await expect(
+    page.getByText("Outcome verified", { exact: true }),
+  ).toBeVisible();
+  const reply = page.getByRole("textbox", { name: "Customer reply draft" });
+  await reply.fill("Access verified. Please sign in again.");
+  await page.route("**/api/tickets/*/runs", (route) =>
+    route.fulfill({ status: 429, json: { detail: "The demo is busy." } }),
+  );
+  await page.getByRole("button", { name: "Run another investigation" }).click();
+  await expect(page.getByRole("alert")).toContainText("The demo is busy.");
+  await expect(
+    page.getByText("Outcome verified", { exact: true }),
+  ).toBeVisible();
+  await expect(reply).toHaveValue("Access verified. Please sign in again.");
+});

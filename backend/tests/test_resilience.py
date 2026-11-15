@@ -36,7 +36,8 @@ def test_revoked_approver_is_checked_before_execution(client, stack):
     assert "permission" in result["error"]
 
 
-def test_operation_receipt_reconciles_worker_crash(client, stack):
+@pytest.mark.parametrize("cancelled", [False, True])
+def test_operation_receipt_reconciles_worker_crash(client, stack, cancelled):
     ticket, run = investigate(client, "billing_recoverable")
     a = run["actions"][0]
     stack.stop_worker()
@@ -62,12 +63,17 @@ def test_operation_receipt_reconciles_worker_crash(client, stack):
                 "UPDATE runs SET status='running',lease_owner=%s,lease_until=now()-interval '1 second',attempts=1 WHERE id=%s",
                 (uuid4(), run["id"]),
             )
+        if cancelled:
+            client.post("/api/runs/" + run["id"] + "/cancel").raise_for_status()
     finally:
         stack.start_worker()
     recovered = wait_run(client, run["id"])
     assert recovered["status"] == "completed"
     assert recovered["attempts"] == 2
     assert recovered["result"]["verification"]["verified"]
+    assert recovered["result"]["verification"]["cancel_requested"] is cancelled
+    assert recovered["actions"][0]["status"] == "succeeded"
+    assert sum(event["kind"] == "verified" for event in recovered["events"]) == 1
     with psycopg.connect(stack.env["SANDBOX_DATABASE_URL"]) as c:
         assert (
             c.execute("SELECT version FROM accounts WHERE id=%s", (ticket["account_id"],)).fetchone()[0] == 2

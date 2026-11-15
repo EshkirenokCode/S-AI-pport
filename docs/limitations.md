@@ -10,7 +10,7 @@
 - Receipt reconciliation supports the included laboratory API. A third-party connector must implement comparable idempotency and reconciliation contracts before mutation is enabled.
 - Cancellation cannot undo an already-applied external effect. An in-flight approved operation is reconciled and verified before its outcome is reported.
 - Readiness checks cover PostgreSQL and the laboratory, not worker liveness. Run history and lease recovery expose stalled work; no external paging system is configured.
-- Expired sessions are rejected, but automatic retention/purging and scheduled backups are not implemented. The standalone demo needs operational retention limits before large-scale public use.
+- The worker removes expired demo workspaces in batches. Active runs delay cleanup, and eligible tenants can wait for later batches. Backups are on demand.
 - The recorded walkthrough uses the clearly labelled deterministic driver. Separate raw reports prove the real-model/MCP smoke runs.
 - Docker Compose is verified in GitHub Actions. This workstation does not have Docker installed; native integration and browser tests run locally.
 - Public hosting and changes to the existing portfolio are separate work.

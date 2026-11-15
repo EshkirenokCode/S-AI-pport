@@ -64,8 +64,9 @@ def offline_next(ticket, messages):
         state[key] = results[relevant].get(key, {})
         event = state[key].get("event")
         kind = "reprocess_billing_event" if family == "billing" else "retry_delivery"
-        facts = [f"Current plan: {state['plan']}."]
+        facts = []
         if family == "billing":
+            facts.append(f"Current plan: {state['plan']}.")
             facts.append(f"Payment status: {state[key].get('payment_status', 'unknown')}.")
         if event:
             facts.append(f"Event {event['id']}: {event['status']}; last error: {event.get('error', 'none')}.")
@@ -101,6 +102,10 @@ def offline_next(ticket, messages):
                     "The paid Pro entitlement is already active and the event was processed.",
                 )
                 reply = "I verified that your Pro access is active and the payment event has already been processed. No repair or additional charge is needed."
+            elif family == "integration" and event and event["status"] == "delivered" and event.get("acknowledged") is True:
+                disposition = "resolved"
+                summary = "The destination already acknowledged this delivery."
+                reply = "I checked the event. The destination has already acknowledged delivery, so no retry is needed."
             else:
                 missing.append(str(e))
                 summary = "The evidence does not satisfy the repair preconditions. Human review is required."

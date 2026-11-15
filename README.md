@@ -85,23 +85,23 @@ cd frontend && npx playwright install chromium && npm run test:e2e
 Integration/browser tests use separate PostgreSQL databases and do not call a live model. CI runs the application suite and an independent container workflow.
 
 ```sh
-make eval
+make eval  # keep the local API, lab, and worker running
 PYTHONPATH=backend .venv/bin/python scripts/evaluate_retrieval.py
 PYTHONPATH=backend .venv/bin/python scripts/compare_retrieval.py
 make live  # explicit calls to the configured free model
 ```
 
-Observed development results, 23 October 2026:
+Observed development results:
 
 | Check | Result | Scope |
 | --- | --- | --- |
-| Backend | 41 passing tests | Real PostgreSQL, HTTP laboratory, MCP, permissions, cancellation, recovery, and retention |
-| Browser | 13 passing scenarios | Three workflows, decline/roles, draft recovery, keyboard dialogs, outage recovery, 320–1024px layouts, automated WCAG A/AA checks |
+| Backend | 45 passing tests | Real PostgreSQL, HTTP laboratory, MCP, permissions, cancellation, recovery, and retention |
+| Browser | 15 passing scenarios | Three workflows, decline/roles, draft recovery, keyboard dialogs, outage recovery, 320–1024px layouts, automated WCAG A/AA checks |
 | Workflow evaluation | 36/36 expected outcomes; zero duplicate effects | Deterministic driver; 24 development and 12 holdout cases |
 | Retrieval | 20/24 baseline → 21/24; long queries 0/6 → 6/6 | Four applicable synthetic documents; lexical retrieval |
 | Live development checks | Three canonical families completed; billing also checked on a pinned free model | Stored model/tool traces; provider-reported cost $0 |
 
-These are small synthetic checks, not general LLM accuracy, a complete accessibility audit, or measured production impact. Historical live failures are retained alongside successful runs. See [methodology and raw reports](docs/evaluations.md) and the [release audit](docs/release-audit.md).
+These are small synthetic checks, not general LLM accuracy, a complete accessibility audit, or measured production impact. Historical live failures are retained alongside successful runs. See [methodology and raw reports](docs/evaluations.md) and the [release audit](docs/release-audit.md) and [November follow-up](docs/audit-2026-11-15.md).
 
 ## Deployment and boundaries
 

@@ -121,6 +121,21 @@ async def ticket(ticket_id: UUID, request: Request, actor=Depends(identity)):
     return {"ticket": row, "account": state, "run_id": run["id"] if run else None}
 
 
+async def require_queue_capacity(c, tenant_id):
+    # Call after taking the shared queue lock in the same transaction.
+    counts = await (
+        await c.execute(
+            """SELECT count(*) AS global_active,count(*) FILTER(WHERE tenant_id=%s) AS workspace_active
+            FROM runs WHERE status IN ('queued','running')""",
+            (tenant_id,),
+        )
+    ).fetchone()
+    if counts["global_active"] >= cfg.global_active_runs:
+        raise HTTPException(429, "The demo is busy. Try again in a moment.")
+    if counts["workspace_active"] >= 3:
+        raise HTTPException(429, "This workspace already has three active runs. Try again when one finishes.")
+
+
 @app.post("/api/tickets/{ticket_id}/runs", status_code=202)
 async def start(ticket_id: UUID, body: StartRun, request: Request, actor=Depends(identity)):
     db = request.app.state.db
@@ -146,20 +161,21 @@ async def start(ticket_id: UUID, body: StartRun, request: Request, actor=Depends
         raise HTTPException(503, "OpenRouter key is not configured. Offline mode remains available.")
     async with db.pool.connection() as c, c.transaction():
         await c.execute("SELECT pg_advisory_xact_lock(928104)")
-        global_count = await (
-            await c.execute("SELECT count(*) AS n FROM runs WHERE status IN ('queued','running')")
-        ).fetchone()
-        if global_count["n"] >= cfg.global_active_runs:
-            raise HTTPException(429, "The demo is busy. Try again in a moment.")
-        await c.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (str(actor["tenant_id"]),))
-        counts = await (
+        # Return the same run when another start request won the race.
+        active = await (
             await c.execute(
-                """SELECT count(*) AS total,count(*) FILTER(WHERE status IN ('queued','running')) AS active
-            FROM runs WHERE tenant_id=%s""",
-                (actor["tenant_id"],),
+                """SELECT id FROM runs WHERE ticket_id=%s AND tenant_id=%s
+                AND status IN ('queued','running','waiting_for_approval')""",
+                (ticket_id, actor["tenant_id"]),
             )
         ).fetchone()
-        if counts["total"] >= cfg.runs_per_tenant or counts["active"] >= 3:
+        if active:
+            return active
+        await require_queue_capacity(c, actor["tenant_id"])
+        counts = await (
+            await c.execute("SELECT count(*) AS total FROM runs WHERE tenant_id=%s", (actor["tenant_id"],))
+        ).fetchone()
+        if counts["total"] >= cfg.runs_per_tenant:
             raise HTTPException(429, "Workspace run quota reached")
         await c.execute(
             "UPDATE tickets SET status='open' WHERE id=%s AND tenant_id=%s", (ticket_id, actor["tenant_id"])
@@ -286,6 +302,8 @@ async def decide(action_id: UUID, body: Decision, request: Request, actor=Depend
         raise HTTPException(403, "An operator must approve or reject repairs")
     db = request.app.state.db
     async with db.pool.connection() as c, c.transaction():
+        if body.decision == "approve":
+            await c.execute("SELECT pg_advisory_xact_lock(928104)")
         reference = await (
             await c.execute(
                 "SELECT run_id FROM actions WHERE id=%s AND tenant_id=%s", (action_id, actor["tenant_id"])
@@ -314,6 +332,8 @@ async def decide(action_id: UUID, body: Decision, request: Request, actor=Depend
             raise HTTPException(409, "This proposal already has a decision")
         if run["status"] != "waiting_for_approval" or run["cancel_requested"]:
             raise HTTPException(409, "Run is not waiting for approval")
+        if wanted == "approved":
+            await require_queue_capacity(c, actor["tenant_id"])
         await c.execute(
             "UPDATE actions SET status=%s,approved_by=%s,approved_at=now() WHERE id=%s",
             (wanted, actor["id"], action_id),
@@ -342,13 +362,19 @@ async def decide(action_id: UUID, body: Decision, request: Request, actor=Depend
                 "UPDATE tickets SET status='needs_human' WHERE id=%s AND tenant_id=%s",
                 (run["ticket_id"], actor["tenant_id"]),
             )
-    await db.event(
-        run,
-        "approval",
-        "Repair approved" if wanted == "approved" else "Repair rejected",
-        {"action_id": str(action_id), "decision": wanted},
-    )
-    await db.audit(actor["tenant_id"], actor["id"], "action." + wanted, action_id, run["id"])
+        await c.execute(
+            "INSERT INTO events(tenant_id,run_id,kind,title,data) VALUES(%s,%s,'approval',%s,%s)",
+            (
+                run["tenant_id"],
+                run["id"],
+                "Repair approved" if wanted == "approved" else "Repair rejected",
+                js({"action_id": str(action_id), "decision": wanted}),
+            ),
+        )
+        await c.execute(
+            "INSERT INTO audit(tenant_id,actor_id,verb,object_id,trace_id) VALUES(%s,%s,%s,%s,%s)",
+            (actor["tenant_id"], actor["id"], "action." + wanted, str(action_id), run["id"]),
+        )
     return {"status": wanted, "run_id": action["run_id"]}
 
 
@@ -428,8 +454,8 @@ if (dist / "assets").exists():
     app.mount("/assets", StaticFiles(directory=dist / "assets"), name="assets")
 
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
 async def index():
     if (dist / "index.html").exists():
-        return FileResponse(dist / "index.html")
+        return FileResponse(dist / "index.html", headers={"Cache-Control": "no-cache"})
     return {"app": "S(AI)pport", "ui": "Run the frontend development server on port 5173."}
